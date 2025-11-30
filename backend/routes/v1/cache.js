@@ -67,6 +67,15 @@ router.post('/images', async (req, res) => {
                 message: 'Image caching cancelled',
                 cancelled: true
             });
+        } else if (error.statusCode === 429 || error.message.includes('429')) {
+            // Check for 429 rate limit error
+            logger.error('Rate limit exceeded (429) in cache images:', error);
+            res.status(429).json({
+                success: false,
+                message: 'Rate limit exceeded (429) - Too many requests. Process stopped.',
+                error: error.message,
+                rateLimitExceeded: true
+            });
         } else {
             logger.error('Error in cache images:', error);
             res.status(500).json({
@@ -218,6 +227,7 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
     };
     
     const CONCURRENT_DOWNLOADS = 8; // Process 8 downloads simultaneously
+    let globalBatchCounter = 0; // Track batches across all JSON files
     
     for (const jsonFile of jsonFiles) {
         // Check for cancellation
@@ -327,31 +337,68 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
                     }
                     
                     const batch = downloadTasks.slice(i, i + CONCURRENT_DOWNLOADS);
-                    console.log(`📦 Processing batch ${Math.floor(i / CONCURRENT_DOWNLOADS) + 1}: ${batch.length} files`);
+                    const localBatchNumber = Math.floor(i / CONCURRENT_DOWNLOADS) + 1;
+                    globalBatchCounter++; // Increment global counter
+                    console.log(`📦 Processing batch ${localBatchNumber} (Global batch #${globalBatchCounter}): ${batch.length} files`);
                     
-                    // Download batch concurrently
-                    const batchPromises = batch.map(async (task) => {
-                        try {
-                            await downloadImage(task.url, task.filePath, abortSignal);
-                            console.log(`✅ Downloaded: ${task.filename}`);
-                            return {
-                                jsonFile: task.jsonFile,
-                                imageFile: task.filename,
-                                status: 'success'
-                            };
-                        } catch (error) {
-                            console.log(`❌ Failed to download ${task.filename}: ${error.message}`);
-                            return {
-                                jsonFile: task.jsonFile,
-                                imageFile: task.filename,
-                                status: 'error',
-                                error: error.message
-                            };
+                    let batchResults;
+                    let has429Error = false;
+                    let retryAttempted = false;
+                    
+                    // Retry logic for 429 errors
+                    while (true) {
+                        // Download batch concurrently
+                        const batchPromises = batch.map(async (task) => {
+                            try {
+                                await downloadImage(task.url, task.filePath, abortSignal);
+                                console.log(`✅ Downloaded: ${task.filename}`);
+                                return {
+                                    jsonFile: task.jsonFile,
+                                    imageFile: task.filename,
+                                    status: 'success'
+                                };
+                            } catch (error) {
+                                // Check for 429 error
+                                if (error.statusCode === 429 || error.message.includes('429')) {
+                                    return {
+                                        jsonFile: task.jsonFile,
+                                        imageFile: task.filename,
+                                        status: 'error',
+                                        error: error.message,
+                                        is429: true
+                                    };
+                                }
+                                console.log(`❌ Failed to download ${task.filename}: ${error.message}`);
+                                return {
+                                    jsonFile: task.jsonFile,
+                                    imageFile: task.filename,
+                                    status: 'error',
+                                    error: error.message
+                                };
+                            }
+                        });
+                        
+                        // Wait for batch to complete
+                        batchResults = await Promise.all(batchPromises);
+                        
+                        // Check if any download got 429 error
+                        has429Error = batchResults.some(result => result.is429);
+                        
+                        if (has429Error && !retryAttempted && abortSignal && !abortSignal.aborted) {
+                            console.log(`🛑 Rate limit exceeded (429) detected in global batch #${globalBatchCounter} - Waiting 6 minutes before retry...`);
+                            retryAttempted = true;
+                            await sleep(360000); // 6 minutes = 360000 milliseconds
+                            console.log(`🔄 Retrying global batch #${globalBatchCounter} after 6 minute wait...`);
+                            continue; // Retry the batch
+                        } else if (has429Error && retryAttempted) {
+                            // Still getting 429 after retry, stop the process
+                            console.log(`🛑 Rate limit exceeded (429) still occurring after retry - Stopping entire process`);
+                            throw new Error('HTTP 429: Too Many Requests - Rate limit exceeded after retry');
+                        } else {
+                            // No 429 error or already retried, break out of retry loop
+                            break;
                         }
-                    });
-                    
-                    // Wait for batch to complete
-                    const batchResults = await Promise.all(batchPromises);
+                    }
                     
                     // Process batch results
                     for (const result of batchResults) {
@@ -361,6 +408,18 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
                         } else {
                             results.errorCount++;
                         }
+                    }
+                    
+                    // Add 6 second delay after every 3rd global batch (3, 6, 9, 12, etc.)
+                    console.log(`🔍 Debug: Global batch #${globalBatchCounter}, modulo 3 = ${globalBatchCounter % 3}`);
+                    if (globalBatchCounter % 3 === 0) {
+                        // Check if operation was cancelled
+                        if (abortSignal && abortSignal.aborted) {
+                            throw new Error('Operation cancelled');
+                        }
+                        console.log(`⏳ Completed ${globalBatchCounter} global batches - Waiting 6 seconds before next batch group...`);
+                        await sleep(6000);
+                        console.log(`✅ 6 second delay completed - Continuing with next batch...`);
                     }
                 }
                 
@@ -373,6 +432,11 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
             if (error.message === 'Operation cancelled') {
                 throw error;
             }
+            // Check for 429 error and stop entire process
+            if (error.statusCode === 429 || error.message.includes('429')) {
+                console.log(`🛑 Rate limit exceeded (429) - Stopping entire image caching process`);
+                throw error; // Re-throw to stop the entire process
+            }
             console.log(`❌ Error processing ${jsonFile.filename}: ${error.message}`);
             results.errorCount++;
             results.details.push({
@@ -380,12 +444,6 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
                 status: 'error',
                 error: error.message
             });
-        }
-        
-        // Add 3 second delay before processing next JSON file
-        if (abortSignal && !abortSignal.aborted) {
-            console.log(`⏳ Waiting 3 seconds before processing next JSON file...`);
-            await sleep(3000);
         }
     }
     
@@ -406,6 +464,12 @@ function downloadImage(url, filePath, abortSignal) {
         const protocol = url.startsWith('https:') ? https : http;
         
         const request = protocol.get(url, (response) => {
+            if (response.statusCode === 429) {
+                const error = new Error('HTTP 429: Too Many Requests - Rate limit exceeded');
+                error.statusCode = 429;
+                reject(error);
+                return;
+            }
             if (response.statusCode !== 200) {
                 reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
                 return;
