@@ -7,6 +7,9 @@ const logger = require('../../utils/logger');
 const https = require('https');
 const http = require('http');
 
+// Helper function to delay execution
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Get downloaded LoRAs from database
 router.get('/downloaded-loras', async (req, res) => {
     try {
@@ -377,6 +380,12 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
                 status: 'error',
                 error: error.message
             });
+        }
+        
+        // Add 3 second delay before processing next JSON file
+        if (abortSignal && !abortSignal.aborted) {
+            console.log(`⏳ Waiting 3 seconds before processing next JSON file...`);
+            await sleep(3000);
         }
     }
     
