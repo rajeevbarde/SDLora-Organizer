@@ -338,8 +338,7 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
                     
                     const batch = downloadTasks.slice(i, i + CONCURRENT_DOWNLOADS);
                     const localBatchNumber = Math.floor(i / CONCURRENT_DOWNLOADS) + 1;
-                    globalBatchCounter++; // Increment global counter
-                    console.log(`📦 Processing batch ${localBatchNumber} (Global batch #${globalBatchCounter}): ${batch.length} files`);
+                    console.log(`📦 Processing batch ${localBatchNumber}: ${batch.length} files`);
                     
                     let batchResults;
                     let has429Error = false;
@@ -385,10 +384,10 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
                         has429Error = batchResults.some(result => result.is429);
                         
                         if (has429Error && !retryAttempted && abortSignal && !abortSignal.aborted) {
-                            console.log(`🛑 Rate limit exceeded (429) detected in global batch #${globalBatchCounter} - Waiting 6 minutes before retry...`);
+                            console.log(`🛑 Rate limit exceeded (429) detected in batch ${localBatchNumber} - Waiting 6 minutes before retry...`);
                             retryAttempted = true;
                             await sleep(360000); // 6 minutes = 360000 milliseconds
-                            console.log(`🔄 Retrying global batch #${globalBatchCounter} after 6 minute wait...`);
+                            console.log(`🔄 Retrying batch ${localBatchNumber} after 6 minute wait...`);
                             continue; // Retry the batch
                         } else if (has429Error && retryAttempted) {
                             // Still getting 429 after retry, stop the process
@@ -400,26 +399,35 @@ async function downloadImagesFromJsonFiles(jsonFiles, basePath, abortSignal) {
                         }
                     }
                     
-                    // Process batch results
+                    // Process batch results and check if any actual downloads succeeded
+                    let hasSuccessfulDownload = false;
                     for (const result of batchResults) {
                         results.details.push(result);
                         if (result.status === 'success') {
                             results.successCount++;
+                            hasSuccessfulDownload = true; // Track if any download actually succeeded
                         } else {
                             results.errorCount++;
                         }
                     }
                     
-                    // Add 6 second delay after every 3rd global batch (3, 6, 9, 12, etc.)
-                    console.log(`🔍 Debug: Global batch #${globalBatchCounter}, modulo 3 = ${globalBatchCounter % 3}`);
-                    if (globalBatchCounter % 3 === 0) {
-                        // Check if operation was cancelled
-                        if (abortSignal && abortSignal.aborted) {
-                            throw new Error('Operation cancelled');
+                    // Only increment global counter if there were actual successful downloads
+                    if (hasSuccessfulDownload) {
+                        globalBatchCounter++;
+                        console.log(`🔍 Debug: Global batch #${globalBatchCounter} (with successful downloads), modulo 3 = ${globalBatchCounter % 3}`);
+                        
+                        // Add 6 second delay after every 3rd global batch with actual downloads (3, 6, 9, 12, etc.)
+                        if (globalBatchCounter % 3 === 0) {
+                            // Check if operation was cancelled
+                            if (abortSignal && abortSignal.aborted) {
+                                throw new Error('Operation cancelled');
+                            }
+                            console.log(`⏳ Completed ${globalBatchCounter} global batches with downloads - Waiting 6 seconds before next batch group...`);
+                            await sleep(6000);
+                            console.log(`✅ 6 second delay completed - Continuing with next batch...`);
                         }
-                        console.log(`⏳ Completed ${globalBatchCounter} global batches - Waiting 6 seconds before next batch group...`);
-                        await sleep(6000);
-                        console.log(`✅ 6 second delay completed - Continuing with next batch...`);
+                    } else {
+                        console.log(`🔍 Debug: Batch had no successful downloads - skipping delay counter increment`);
                     }
                 }
                 
