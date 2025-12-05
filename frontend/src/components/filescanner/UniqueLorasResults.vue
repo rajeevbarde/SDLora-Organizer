@@ -177,7 +177,7 @@ export default {
           case 'unique-downloaded':
             return file.status === 'Unique' && file.isDownloaded === 1;
           case 'unique-not-downloaded':
-            return file.status === 'Unique' && (file.isDownloaded === 0 || file.isDownloaded === 4);
+            return file.status === 'Unique' && (file.isDownloaded === 0 || file.isDownloaded === 3 || file.isDownloaded === 4);
           case 'duplicate-issues':
             return file.status !== 'Unique';
           default:
