@@ -35,6 +35,7 @@
                 <th class="base-model-header">Base Model</th>
                 <th v-for="nsfwGroup in matrixData.nsfwGroups" :key="nsfwGroup" class="nsfw-header">{{ nsfwGroup }}</th>
                 <th class="total-header">Total</th>
+                <th class="size-header">File Size</th>
               </tr>
             </thead>
             <tbody>
@@ -46,6 +47,9 @@
                 <td class="total-cell">
                   {{ getRowTotal(baseModel) }}
                 </td>
+                <td class="size-cell">
+                  {{ formatFileSize(getRowTotalSize(baseModel) * 1024) }}
+                </td>
               </tr>
             </tbody>
             <tfoot>
@@ -55,6 +59,9 @@
                   {{ getColumnTotal(nsfwGroup) }}
                 </td>
                 <td class="grand-total">{{ getGrandTotal() }}</td>
+                <td class="grand-total-size">
+                  {{ formatFileSize(getGrandTotalSize() * 1024) }}
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -72,6 +79,8 @@
 </template>
 
 <script>
+import { formatFileSize } from '../../utils/helpers.js';
+
 export default {
   name: 'ModelOverviewMatrix',
   props: {
@@ -80,6 +89,7 @@ export default {
     error: String
   },
   methods: {
+    formatFileSize,
     getRowTotal(baseModel) {
       if (!this.matrixData) return 0;
       return this.matrixData.nsfwGroups.reduce((total, nsfwGroup) => {
@@ -97,6 +107,14 @@ export default {
       return this.matrixData.baseModels.reduce((total, baseModel) => {
         return total + this.getRowTotal(baseModel);
       }, 0);
+    },
+    getRowTotalSize(baseModel) {
+      if (!this.matrixData || !this.matrixData.sizeByBaseModel) return 0;
+      return this.matrixData.sizeByBaseModel[baseModel] || 0;
+    },
+    getGrandTotalSize() {
+      if (!this.matrixData || typeof this.matrixData.grandTotalSizeKB !== 'number') return 0;
+      return this.matrixData.grandTotalSizeKB;
     }
   }
 };
@@ -316,6 +334,13 @@ export default {
   color: #065f46 !important;
   font-size: 1rem !important;
 }
+.size-header {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%) !important;
+  font-weight: 700 !important;
+  min-width: 140px;
+  color: #4c1d95 !important;
+  font-size: 0.9rem !important;
+}
 .base-model-cell {
   text-align: left !important;
   font-weight: 600;
@@ -351,6 +376,13 @@ export default {
   font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
   font-size: 1rem;
 }
+.size-cell {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  font-weight: 600;
+  color: #4c1d95;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 0.9rem;
+}
 .total-row {
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
 }
@@ -371,6 +403,15 @@ export default {
 .grand-total {
   font-weight: 800;
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: white;
+  font-size: 1rem;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.grand-total-size {
+  font-weight: 800;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
   color: white;
   font-size: 1rem;
   font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;

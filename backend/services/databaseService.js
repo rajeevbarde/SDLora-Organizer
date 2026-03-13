@@ -380,7 +380,7 @@ class DatabaseService {
         }
     }
 
-    // Get download matrix data - counts by base model and NSFW level for downloaded items
+    // Get download matrix data - counts and total file size by base model and NSFW level for downloaded items
     async getDownloadMatrix() {
         const startTime = Date.now();
         logger.userAction('Summary loading started');
@@ -388,7 +388,8 @@ class DatabaseService {
             SELECT 
                 basemodel,
                 modelVersionNsfwLevel,
-                COUNT(*) as count
+                COUNT(*) as count,
+                SUM(size_in_kb) as total_size_kb
             FROM ALLCivitData
             WHERE isDownloaded = 1
                 AND basemodel IS NOT NULL 
@@ -415,6 +416,7 @@ class DatabaseService {
             // Transform the data into matrix format with grouped NSFW levels
             const matrix = {};
             const baseModels = new Set();
+            const sizeByBaseModel = {};
             
             // First pass: collect all unique base models
             rows.forEach(row => {
@@ -427,12 +429,14 @@ class DatabaseService {
                 Object.keys(nsfwGroups).forEach(groupName => {
                     matrix[baseModel][groupName] = 0;
                 });
+                sizeByBaseModel[baseModel] = 0;
             });
             
             // Fill in the actual counts by grouping NSFW levels
             rows.forEach(row => {
                 const nsfwLevel = row.modelVersionNsfwLevel;
                 const count = row.count;
+                const totalSizeKB = row.total_size_kb || 0;
                 
                 // Find which group this NSFW level belongs to
                 for (const [groupName, levels] of Object.entries(nsfwGroups)) {
@@ -441,14 +445,21 @@ class DatabaseService {
                         break;
                     }
                 }
+
+                // Accumulate total file size per base model (in KB)
+                sizeByBaseModel[row.basemodel] += totalSizeKB;
             });
+            
+            const grandTotalSizeKB = Object.values(sizeByBaseModel).reduce((sum, value) => sum + value, 0);
             
             logger.userAction('Summary loading completed', { baseModels: baseModels.size });
             logger.logTimeTaken('Summary loading', startTime, { baseModels: baseModels.size });
             return {
                 matrix,
                 baseModels: Array.from(baseModels).sort(),
-                nsfwGroups: Object.keys(nsfwGroups)
+                nsfwGroups: Object.keys(nsfwGroups),
+                sizeByBaseModel,
+                grandTotalSizeKB
             };
         } finally {
             if (connection) {
