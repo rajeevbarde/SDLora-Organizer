@@ -33,7 +33,8 @@ const mockDatabaseService = {
   getLatestUpdatedCheckpoints: jest.fn(),
   getAllCivitDataRowCount: jest.fn(),
   getRelatedLoraByModelId: jest.fn(),
-  markModelAsIgnored: jest.fn()
+  markModelAsIgnored: jest.fn(),
+  getModelsWithMultipleVersions: jest.fn()
 };
 
 jest.mock('../services/databaseService', () => mockDatabaseService);
@@ -397,6 +398,44 @@ describe('Models Routes', () => {
         .expect(500);
 
       expect(response.body).toEqual({ error: errorMessage });
+    });
+  });
+
+  describe('GET /multi-version-models', () => {
+    it('should return models with multiple versions', async () => {
+      const mockResult = {
+        models: [
+          {
+            modelId: 1,
+            modelName: 'Test Model',
+            versionCount: 2,
+            versions: [
+              { modelVersionId: 10, modelVersionName: 'v1', fileName: 'a.safetensors' },
+              { modelVersionId: 11, modelVersionName: 'v2', fileName: 'b.safetensors' }
+            ]
+          }
+        ],
+        totalModels: 1,
+        totalVersions: 2
+      };
+      mockDatabaseService.getModelsWithMultipleVersions.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .get('/api/v1/models/multi-version-models')
+        .expect(200);
+
+      expect(mockDatabaseService.getModelsWithMultipleVersions).toHaveBeenCalled();
+      expect(response.body).toEqual(mockResult);
+    });
+
+    it('should handle database service errors', async () => {
+      mockDatabaseService.getModelsWithMultipleVersions.mockRejectedValue(new Error('DB error'));
+
+      const response = await request(app)
+        .get('/api/v1/models/multi-version-models')
+        .expect(500);
+
+      expect(response.body).toEqual({ error: 'Failed to get multi-version models' });
     });
   });
 

@@ -167,6 +167,17 @@ router.get('/row-count', async (req, res) => {
     }
 });
 
+// Get models with multiple versions (same modelId, 2+ modelVersionIds)
+router.get('/multi-version-models', async (req, res) => {
+    try {
+        const result = await databaseService.getModelsWithMultipleVersions();
+        res.json(result);
+    } catch (error) {
+        logger.error('Error getting multi-version models:', error);
+        res.status(500).json({ error: 'Failed to get multi-version models' });
+    }
+});
+
 // Get related LoRA by modelId
 router.get('/related-lora/:modelId', async (req, res) => {
     try {

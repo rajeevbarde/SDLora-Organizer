@@ -11,9 +11,12 @@
       :duplicate-timer="duplicateTimer"
       :bad-downloads-loading="badDownloadsLoading"
       :bad-downloads-timer="badDownloadsTimer"
+      :model-versions-loading="modelVersionsLoading"
+      :model-versions-timer="modelVersionsTimer"
       @scan-orphan-files="scanForMissingFiles"
       @scan-duplicate-issues="onDuplicateIssuesClick"
       @scan-bad-downloads="onBadDownloadsClick"
+      @scan-model-versions="onModelVersionsClick"
     />
     
     <!-- Duplicate Issues Component -->
@@ -49,6 +52,16 @@
       :bad-downloads="badDownloads"
       @identify="onIdentifyBadDownload"
     />
+
+    <ModelVersionsResults
+      :show-model-versions="showModelVersions"
+      :model-versions-loading="modelVersionsLoading"
+      :model-versions-error="modelVersionsError"
+      :models="modelVersions"
+      :total-models="modelVersionsTotalModels"
+      :total-versions="modelVersionsTotalVersions"
+      :frontend-base-url="frontendBaseUrl"
+    />
   </div>
 </template>
 
@@ -64,6 +77,7 @@ import CivitDataFetcherControls from '@/components/orphanduplicates/CivitDataFet
 import DuplicateIssuesTabs from '@/components/orphanduplicates/DuplicateIssuesTabs.vue';
 import OrphanFilesResults from '@/components/orphanduplicates/OrphanFilesResults.vue';
 import BadDownloadsResults from '@/components/orphanduplicates/BadDownloadsResults.vue';
+import ModelVersionsResults from '@/components/orphanduplicates/ModelVersionsResults.vue';
 
 export default {
   name: 'CivitDataFetcherRefactored',
@@ -72,7 +86,8 @@ export default {
     CivitDataFetcherControls,
     DuplicateIssuesTabs,
     OrphanFilesResults,
-    BadDownloadsResults
+    BadDownloadsResults,
+    ModelVersionsResults
   },
   setup() {
     const errorHandler = useErrorHandler();
@@ -121,6 +136,17 @@ export default {
       badDownloadsTimer: 0,
       badDownloadsStartTime: null,
       badDownloadsInterval: null,
+
+      // Model versions state
+      modelVersionsLoading: false,
+      modelVersions: [],
+      modelVersionsError: null,
+      showModelVersions: false,
+      modelVersionsTotalModels: 0,
+      modelVersionsTotalVersions: 0,
+      modelVersionsTimer: 0,
+      modelVersionsStartTime: null,
+      modelVersionsInterval: null,
       
       // Hash check state
       hashCheckLoading: {},
@@ -520,6 +546,21 @@ export default {
         this.badDownloadsInterval = null;
       }
     },
+
+    resetModelVersionsState() {
+      this.modelVersions = [];
+      this.modelVersionsError = null;
+      this.showModelVersions = false;
+      this.modelVersionsTotalModels = 0;
+      this.modelVersionsTotalVersions = 0;
+
+      this.modelVersionsTimer = 0;
+      this.modelVersionsStartTime = null;
+      if (this.modelVersionsInterval) {
+        clearInterval(this.modelVersionsInterval);
+        this.modelVersionsInterval = null;
+      }
+    },
     
     onDuplicateIssuesClick() {
       this.scanResults = null;
@@ -531,7 +572,8 @@ export default {
         this.scanInterval = null;
       }
       
-      this.resetDuplicateIssuesState();
+      this.resetBadDownloadsState();
+      this.resetModelVersionsState();
       this.fetchDuplicateIssues();
     },
     
@@ -556,7 +598,33 @@ export default {
       }
       
       this.resetBadDownloadsState();
+      this.resetModelVersionsState();
       this.fetchBadDownloads();
+    },
+
+    onModelVersionsClick() {
+      this.scanResults = null;
+      this.isScanning = false;
+      this.scanTimer = 0;
+      this.scanStartTime = null;
+      if (this.scanInterval) {
+        clearInterval(this.scanInterval);
+        this.scanInterval = null;
+      }
+
+      this.duplicateIssues = null;
+      this.duplicateIssuesError = null;
+      this.showDuplicateIssues = false;
+      this.duplicateTimer = 0;
+      this.duplicateStartTime = null;
+      if (this.duplicateInterval) {
+        clearInterval(this.duplicateInterval);
+        this.duplicateInterval = null;
+      }
+
+      this.resetBadDownloadsState();
+      this.resetModelVersionsState();
+      this.fetchModelVersions();
     },
     
     async fetchDuplicateIssues() {
@@ -629,6 +697,44 @@ export default {
         if (this.badDownloadsStartTime) this.badDownloadsTimer = (performance.now() - this.badDownloadsStartTime) / 1000;
         this.badDownloadsInterval = null;
         this.badDownloadsStartTime = null;
+      }
+    },
+
+    async fetchModelVersions() {
+      this.modelVersionsLoading = true;
+      this.modelVersionsError = null;
+      this.showModelVersions = false;
+
+      this.modelVersionsStartTime = performance.now();
+      this.modelVersionsTimer = 0;
+      if (this.modelVersionsInterval) clearInterval(this.modelVersionsInterval);
+      this.modelVersionsInterval = setInterval(() => {
+        if (this.modelVersionsLoading && this.modelVersionsStartTime) {
+          this.modelVersionsTimer = (performance.now() - this.modelVersionsStartTime) / 1000;
+        }
+      }, 10);
+
+      try {
+        const data = await apiService.getMultiVersionModels();
+        this.modelVersions = data?.models || [];
+        this.modelVersionsTotalModels = data?.totalModels || 0;
+        this.modelVersionsTotalVersions = data?.totalVersions || 0;
+        this.showModelVersions = true;
+        this.errorHandler.handleSuccess('Model versions loaded successfully');
+      } catch (error) {
+        this.modelVersionsError = error.message || 'Failed to load model versions.';
+        this.modelVersions = [];
+        this.modelVersionsTotalModels = 0;
+        this.modelVersionsTotalVersions = 0;
+        this.showModelVersions = true;
+      } finally {
+        this.modelVersionsLoading = false;
+        if (this.modelVersionsInterval) clearInterval(this.modelVersionsInterval);
+        if (this.modelVersionsStartTime) {
+          this.modelVersionsTimer = (performance.now() - this.modelVersionsStartTime) / 1000;
+        }
+        this.modelVersionsInterval = null;
+        this.modelVersionsStartTime = null;
       }
     },
     

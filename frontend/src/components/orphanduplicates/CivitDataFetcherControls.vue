@@ -53,6 +53,22 @@
           <span class="timer-text">{{ badDownloadsTimer.toFixed(2) }}s</span>
         </div>
       </div>
+
+      <div class="button-group">
+        <button
+          @click="$emit('scan-model-versions')"
+          :disabled="modelVersionsLoading"
+          class="control-btn quaternary-btn"
+        >
+          <span class="btn-icon">📚</span>
+          <span class="btn-text">{{ modelVersionsLoading ? 'Loading...' : 'Model Versions' }}</span>
+        </button>
+
+        <div v-if="modelVersionsLoading || modelVersionsTimer > 0" class="timer-display">
+          <span class="timer-icon">⏱️</span>
+          <span class="timer-text">{{ modelVersionsTimer.toFixed(2) }}s</span>
+        </div>
+      </div>
     </div>
     
     <div v-if="isScanning" class="scan-progress">
@@ -91,9 +107,17 @@ export default {
     badDownloadsTimer: {
       type: Number,
       default: 0
+    },
+    modelVersionsLoading: {
+      type: Boolean,
+      default: false
+    },
+    modelVersionsTimer: {
+      type: Number,
+      default: 0
     }
   },
-  emits: ['scan-orphan-files', 'scan-duplicate-issues', 'scan-bad-downloads']
+  emits: ['scan-orphan-files', 'scan-duplicate-issues', 'scan-bad-downloads', 'scan-model-versions']
 }
 </script>
 
@@ -225,6 +249,22 @@ export default {
 }
 
 .tertiary-btn:disabled {
+  background: #b8c2cc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.quaternary-btn {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+.quaternary-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3d9be8 0%, #00d9e8 100%);
+}
+
+.quaternary-btn:disabled {
   background: #b8c2cc;
   cursor: not-allowed;
   transform: none;

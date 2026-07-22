@@ -744,6 +744,71 @@ class DatabaseService {
         }
     }
 
+    // Get models that have more than one version in the database
+    async getModelsWithMultipleVersions() {
+        const query = `
+            SELECT
+                modelId,
+                modelName,
+                modelVersionId,
+                modelVersionName,
+                fileName,
+                basemodel,
+                isDownloaded,
+                file_path,
+                publishedAt
+            FROM ALLCivitData
+            WHERE modelId IN (
+                SELECT modelId
+                FROM ALLCivitData
+                GROUP BY modelId
+                HAVING COUNT(DISTINCT modelVersionId) > 1
+            )
+            ORDER BY modelId, publishedAt DESC, modelVersionId DESC
+        `;
+
+        let connection;
+        try {
+            connection = await dbPool.getConnection();
+            const rows = await dbPool.runQuery(connection, query);
+
+            const modelsMap = new Map();
+            for (const row of rows) {
+                if (!modelsMap.has(row.modelId)) {
+                    modelsMap.set(row.modelId, {
+                        modelId: row.modelId,
+                        modelName: row.modelName,
+                        versions: []
+                    });
+                }
+                modelsMap.get(row.modelId).versions.push({
+                    modelVersionId: row.modelVersionId,
+                    modelVersionName: row.modelVersionName,
+                    fileName: row.fileName,
+                    basemodel: row.basemodel,
+                    isDownloaded: row.isDownloaded,
+                    file_path: row.file_path,
+                    publishedAt: row.publishedAt
+                });
+            }
+
+            const models = Array.from(modelsMap.values()).map(model => ({
+                ...model,
+                versionCount: model.versions.length
+            }));
+
+            return {
+                models,
+                totalModels: models.length,
+                totalVersions: rows.length
+            };
+        } finally {
+            if (connection) {
+                dbPool.releaseConnection(connection);
+            }
+        }
+    }
+
     // Get all models with the same modelId (for Related LoRA)
     async getRelatedLoraByModelId(modelId) {
         const query = `

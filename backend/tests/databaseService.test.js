@@ -262,6 +262,31 @@ describe('DatabaseService', () => {
     });
   });
 
+  describe('getModelsWithMultipleVersions', () => {
+    let connection;
+    beforeEach(() => {
+      connection = {};
+      dbPool.getConnection.mockResolvedValue(connection);
+      dbPool.getConnection.mockClear();
+      dbPool.releaseConnection.mockClear();
+      dbPool.runQuery = jest.fn();
+      dbPool.runQuery.mockClear();
+    });
+
+    it('should group only models with multiple versions', async () => {
+      dbPool.runQuery.mockResolvedValue([
+        { modelId: 1, modelName: 'Model A', modelVersionId: 10, modelVersionName: 'v1', fileName: 'a.safetensors', basemodel: 'SDXL 1.0', isDownloaded: 1, file_path: '/a', publishedAt: '2024-01-02' },
+        { modelId: 1, modelName: 'Model A', modelVersionId: 11, modelVersionName: 'v2', fileName: 'b.safetensors', basemodel: 'SDXL 1.0', isDownloaded: 0, file_path: null, publishedAt: '2024-01-01' }
+      ]);
+
+      const result = await databaseService.getModelsWithMultipleVersions();
+      expect(result.totalModels).toBe(1);
+      expect(result.totalVersions).toBe(2);
+      expect(result.models[0].versionCount).toBe(2);
+      expect(result.models[0].versions).toHaveLength(2);
+    });
+  });
+
   describe('searchModelsByFilePaths', () => {
     let connection;
     beforeEach(() => {

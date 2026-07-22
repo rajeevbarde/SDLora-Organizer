@@ -67,6 +67,13 @@ export const apiService = {
     return response.data;
   },
 
+  async getMultiVersionModels(options = {}) {
+    const response = await api.get('/models/multi-version-models', {
+      signal: options.signal
+    });
+    return response.data;
+  },
+
   async fetchMetadata(forceUpdate = false, options = {}) {
     const response = await api.post('/models/fetch-metadata', { forceUpdate }, {
       signal: options.signal
