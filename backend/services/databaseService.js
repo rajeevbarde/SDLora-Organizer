@@ -744,8 +744,8 @@ class DatabaseService {
         }
     }
 
-    // Get models that have more than one version in the database
-    async getModelsWithMultipleVersions() {
+    // Get models grouped by modelId where version count matches having clause
+    async getModelsGroupedByVersionCount(havingClause) {
         const query = `
             SELECT
                 modelId,
@@ -762,7 +762,7 @@ class DatabaseService {
                 SELECT modelId
                 FROM ALLCivitData
                 GROUP BY modelId
-                HAVING COUNT(DISTINCT modelVersionId) > 1
+                ${havingClause}
             )
             ORDER BY modelId, publishedAt DESC, modelVersionId DESC
         `;
@@ -807,6 +807,16 @@ class DatabaseService {
                 dbPool.releaseConnection(connection);
             }
         }
+    }
+
+    // Get models that have more than one version in the database
+    async getModelsWithMultipleVersions() {
+        return this.getModelsGroupedByVersionCount('HAVING COUNT(DISTINCT modelVersionId) > 1');
+    }
+
+    // Get models that have exactly one version in the database
+    async getModelsWithSingleVersion() {
+        return this.getModelsGroupedByVersionCount('HAVING COUNT(DISTINCT modelVersionId) = 1');
     }
 
     // Get all models with the same modelId (for Related LoRA)

@@ -74,6 +74,13 @@ export const apiService = {
     return response.data;
   },
 
+  async getSingleVersionModels(options = {}) {
+    const response = await api.get('/models/single-version-models', {
+      signal: options.signal
+    });
+    return response.data;
+  },
+
   async fetchMetadata(forceUpdate = false, options = {}) {
     const response = await api.post('/models/fetch-metadata', { forceUpdate }, {
       signal: options.signal

@@ -13,10 +13,13 @@
       :bad-downloads-timer="badDownloadsTimer"
       :model-versions-loading="modelVersionsLoading"
       :model-versions-timer="modelVersionsTimer"
+      :single-model-version-loading="singleModelVersionLoading"
+      :single-model-version-timer="singleModelVersionTimer"
       @scan-orphan-files="scanForMissingFiles"
       @scan-duplicate-issues="onDuplicateIssuesClick"
       @scan-bad-downloads="onBadDownloadsClick"
       @scan-model-versions="onModelVersionsClick"
+      @scan-single-model-version="onSingleModelVersionClick"
     />
     
     <!-- Duplicate Issues Component -->
@@ -61,6 +64,22 @@
       :total-models="modelVersionsTotalModels"
       :total-versions="modelVersionsTotalVersions"
       :frontend-base-url="frontendBaseUrl"
+    />
+
+    <ModelVersionsResults
+      :show-model-versions="showSingleModelVersion"
+      :model-versions-loading="singleModelVersionLoading"
+      :model-versions-error="singleModelVersionError"
+      :models="singleModelVersions"
+      :total-models="singleModelVersionTotalModels"
+      :total-versions="singleModelVersionTotalVersions"
+      :frontend-base-url="frontendBaseUrl"
+      section-title="Single Model Version"
+      loading-text="Loading models with a single version..."
+      results-subtitle="These CivitAI models have exactly one version in your database. Multi-version models are hidden."
+      empty-title="No single-version models found"
+      empty-subtitle="Every model in your database currently has more than one version"
+      :show-version-count="false"
     />
   </div>
 </template>
@@ -147,6 +166,17 @@ export default {
       modelVersionsTimer: 0,
       modelVersionsStartTime: null,
       modelVersionsInterval: null,
+
+      // Single model version state
+      singleModelVersionLoading: false,
+      singleModelVersions: [],
+      singleModelVersionError: null,
+      showSingleModelVersion: false,
+      singleModelVersionTotalModels: 0,
+      singleModelVersionTotalVersions: 0,
+      singleModelVersionTimer: 0,
+      singleModelVersionStartTime: null,
+      singleModelVersionInterval: null,
       
       // Hash check state
       hashCheckLoading: {},
@@ -561,6 +591,21 @@ export default {
         this.modelVersionsInterval = null;
       }
     },
+
+    resetSingleModelVersionState() {
+      this.singleModelVersions = [];
+      this.singleModelVersionError = null;
+      this.showSingleModelVersion = false;
+      this.singleModelVersionTotalModels = 0;
+      this.singleModelVersionTotalVersions = 0;
+
+      this.singleModelVersionTimer = 0;
+      this.singleModelVersionStartTime = null;
+      if (this.singleModelVersionInterval) {
+        clearInterval(this.singleModelVersionInterval);
+        this.singleModelVersionInterval = null;
+      }
+    },
     
     onDuplicateIssuesClick() {
       this.scanResults = null;
@@ -574,6 +619,7 @@ export default {
       
       this.resetBadDownloadsState();
       this.resetModelVersionsState();
+      this.resetSingleModelVersionState();
       this.fetchDuplicateIssues();
     },
     
@@ -599,6 +645,7 @@ export default {
       
       this.resetBadDownloadsState();
       this.resetModelVersionsState();
+      this.resetSingleModelVersionState();
       this.fetchBadDownloads();
     },
 
@@ -623,8 +670,35 @@ export default {
       }
 
       this.resetBadDownloadsState();
+      this.resetSingleModelVersionState();
       this.resetModelVersionsState();
       this.fetchModelVersions();
+    },
+
+    onSingleModelVersionClick() {
+      this.scanResults = null;
+      this.isScanning = false;
+      this.scanTimer = 0;
+      this.scanStartTime = null;
+      if (this.scanInterval) {
+        clearInterval(this.scanInterval);
+        this.scanInterval = null;
+      }
+
+      this.duplicateIssues = null;
+      this.duplicateIssuesError = null;
+      this.showDuplicateIssues = false;
+      this.duplicateTimer = 0;
+      this.duplicateStartTime = null;
+      if (this.duplicateInterval) {
+        clearInterval(this.duplicateInterval);
+        this.duplicateInterval = null;
+      }
+
+      this.resetBadDownloadsState();
+      this.resetModelVersionsState();
+      this.resetSingleModelVersionState();
+      this.fetchSingleModelVersions();
     },
     
     async fetchDuplicateIssues() {
@@ -735,6 +809,44 @@ export default {
         }
         this.modelVersionsInterval = null;
         this.modelVersionsStartTime = null;
+      }
+    },
+
+    async fetchSingleModelVersions() {
+      this.singleModelVersionLoading = true;
+      this.singleModelVersionError = null;
+      this.showSingleModelVersion = false;
+
+      this.singleModelVersionStartTime = performance.now();
+      this.singleModelVersionTimer = 0;
+      if (this.singleModelVersionInterval) clearInterval(this.singleModelVersionInterval);
+      this.singleModelVersionInterval = setInterval(() => {
+        if (this.singleModelVersionLoading && this.singleModelVersionStartTime) {
+          this.singleModelVersionTimer = (performance.now() - this.singleModelVersionStartTime) / 1000;
+        }
+      }, 10);
+
+      try {
+        const data = await apiService.getSingleVersionModels();
+        this.singleModelVersions = data?.models || [];
+        this.singleModelVersionTotalModels = data?.totalModels || 0;
+        this.singleModelVersionTotalVersions = data?.totalVersions || 0;
+        this.showSingleModelVersion = true;
+        this.errorHandler.handleSuccess('Single model version report loaded successfully');
+      } catch (error) {
+        this.singleModelVersionError = error.message || 'Failed to load single model version report.';
+        this.singleModelVersions = [];
+        this.singleModelVersionTotalModels = 0;
+        this.singleModelVersionTotalVersions = 0;
+        this.showSingleModelVersion = true;
+      } finally {
+        this.singleModelVersionLoading = false;
+        if (this.singleModelVersionInterval) clearInterval(this.singleModelVersionInterval);
+        if (this.singleModelVersionStartTime) {
+          this.singleModelVersionTimer = (performance.now() - this.singleModelVersionStartTime) / 1000;
+        }
+        this.singleModelVersionInterval = null;
+        this.singleModelVersionStartTime = null;
       }
     },
     

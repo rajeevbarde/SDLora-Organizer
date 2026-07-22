@@ -69,6 +69,22 @@
           <span class="timer-text">{{ modelVersionsTimer.toFixed(2) }}s</span>
         </div>
       </div>
+
+      <div class="button-group">
+        <button
+          @click="$emit('scan-single-model-version')"
+          :disabled="singleModelVersionLoading"
+          class="control-btn quinary-btn"
+        >
+          <span class="btn-icon">📄</span>
+          <span class="btn-text">{{ singleModelVersionLoading ? 'Loading...' : 'Single Model Version' }}</span>
+        </button>
+
+        <div v-if="singleModelVersionLoading || singleModelVersionTimer > 0" class="timer-display">
+          <span class="timer-icon">⏱️</span>
+          <span class="timer-text">{{ singleModelVersionTimer.toFixed(2) }}s</span>
+        </div>
+      </div>
     </div>
     
     <div v-if="isScanning" class="scan-progress">
@@ -115,9 +131,23 @@ export default {
     modelVersionsTimer: {
       type: Number,
       default: 0
+    },
+    singleModelVersionLoading: {
+      type: Boolean,
+      default: false
+    },
+    singleModelVersionTimer: {
+      type: Number,
+      default: 0
     }
   },
-  emits: ['scan-orphan-files', 'scan-duplicate-issues', 'scan-bad-downloads', 'scan-model-versions']
+  emits: [
+    'scan-orphan-files',
+    'scan-duplicate-issues',
+    'scan-bad-downloads',
+    'scan-model-versions',
+    'scan-single-model-version'
+  ]
 }
 </script>
 
@@ -265,6 +295,22 @@ export default {
 }
 
 .quaternary-btn:disabled {
+  background: #b8c2cc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.quinary-btn {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: white;
+}
+
+.quinary-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3ad66f 0%, #2ee0c4 100%);
+}
+
+.quinary-btn:disabled {
   background: #b8c2cc;
   cursor: not-allowed;
   transform: none;

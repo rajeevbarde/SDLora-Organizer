@@ -1,9 +1,9 @@
 <template>
   <div v-if="showModelVersions" class="model-versions-section">
-    <h2 class="section-title">Model Versions</h2>
+    <h2 class="section-title">{{ sectionTitle }}</h2>
     <div v-if="modelVersionsLoading" class="loading-state">
       <div class="loading-spinner"></div>
-      <span>Loading models with multiple versions...</span>
+      <span>{{ loadingText }}</span>
     </div>
     <div v-else-if="modelVersionsError" class="error-card">{{ modelVersionsError }}</div>
     <div v-else-if="models.length > 0" class="results-container">
@@ -12,9 +12,7 @@
           Showing {{ filteredModels.length }} of {{ totalModels }} models
           <span class="results-version-count">({{ filteredVersionCount }} versions)</span>
         </h3>
-        <p class="results-subtitle">
-          These CivitAI models have more than one version in your database. Single-version models are hidden.
-        </p>
+        <p class="results-subtitle">{{ resultsSubtitle }}</p>
 
         <div class="filters-row">
           <label class="filter-item">
@@ -69,7 +67,7 @@
             <tr v-for="model in filteredModels" :key="model.modelId" class="table-row">
               <td class="model-cell">
                 <span class="model-name">{{ model.modelName || 'Unknown model' }}</span>
-                <span class="version-count">({{ model.versionCount }} versions)</span>
+                <span v-if="showVersionCount" class="version-count">({{ model.versionCount }} versions)</span>
               </td>
               <td class="versions-cell">
                 <template v-for="(version, index) in model.versions" :key="version.modelVersionId">
@@ -98,8 +96,8 @@
     </div>
     <div v-else class="no-results">
       <div class="no-results-icon">✅</div>
-      <h3 class="no-results-title">No multi-version models found</h3>
-      <p class="no-results-subtitle">Every model in your database currently has only one version</p>
+      <h3 class="no-results-title">{{ emptyTitle }}</h3>
+      <p class="no-results-subtitle">{{ emptySubtitle }}</p>
     </div>
   </div>
 </template>
@@ -137,6 +135,30 @@ export default {
     frontendBaseUrl: {
       type: String,
       required: true
+    },
+    sectionTitle: {
+      type: String,
+      default: 'Model Versions'
+    },
+    loadingText: {
+      type: String,
+      default: 'Loading models with multiple versions...'
+    },
+    resultsSubtitle: {
+      type: String,
+      default: 'These CivitAI models have more than one version in your database. Single-version models are hidden.'
+    },
+    emptyTitle: {
+      type: String,
+      default: 'No multi-version models found'
+    },
+    emptySubtitle: {
+      type: String,
+      default: 'Every model in your database currently has only one version'
+    },
+    showVersionCount: {
+      type: Boolean,
+      default: true
     }
   },
   data() {

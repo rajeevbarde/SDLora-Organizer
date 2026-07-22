@@ -287,6 +287,30 @@ describe('DatabaseService', () => {
     });
   });
 
+  describe('getModelsWithSingleVersion', () => {
+    let connection;
+    beforeEach(() => {
+      connection = {};
+      dbPool.getConnection.mockResolvedValue(connection);
+      dbPool.getConnection.mockClear();
+      dbPool.releaseConnection.mockClear();
+      dbPool.runQuery = jest.fn();
+      dbPool.runQuery.mockClear();
+    });
+
+    it('should group only models with exactly one version', async () => {
+      dbPool.runQuery.mockResolvedValue([
+        { modelId: 2, modelName: 'Model B', modelVersionId: 20, modelVersionName: 'v1', fileName: 'c.safetensors', basemodel: 'SD 1.5', isDownloaded: 1, file_path: '/c', publishedAt: '2024-01-02' }
+      ]);
+
+      const result = await databaseService.getModelsWithSingleVersion();
+      expect(result.totalModels).toBe(1);
+      expect(result.totalVersions).toBe(1);
+      expect(result.models[0].versionCount).toBe(1);
+      expect(result.models[0].versions).toHaveLength(1);
+    });
+  });
+
   describe('searchModelsByFilePaths', () => {
     let connection;
     beforeEach(() => {

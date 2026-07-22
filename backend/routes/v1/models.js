@@ -178,6 +178,17 @@ router.get('/multi-version-models', async (req, res) => {
     }
 });
 
+// Get models with exactly one version (same modelId, 1 modelVersionId)
+router.get('/single-version-models', async (req, res) => {
+    try {
+        const result = await databaseService.getModelsWithSingleVersion();
+        res.json(result);
+    } catch (error) {
+        logger.error('Error getting single-version models:', error);
+        res.status(500).json({ error: 'Failed to get single-version models' });
+    }
+});
+
 // Get related LoRA by modelId
 router.get('/related-lora/:modelId', async (req, res) => {
     try {

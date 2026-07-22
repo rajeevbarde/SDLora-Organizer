@@ -34,7 +34,8 @@ const mockDatabaseService = {
   getAllCivitDataRowCount: jest.fn(),
   getRelatedLoraByModelId: jest.fn(),
   markModelAsIgnored: jest.fn(),
-  getModelsWithMultipleVersions: jest.fn()
+  getModelsWithMultipleVersions: jest.fn(),
+  getModelsWithSingleVersion: jest.fn()
 };
 
 jest.mock('../services/databaseService', () => mockDatabaseService);
@@ -436,6 +437,43 @@ describe('Models Routes', () => {
         .expect(500);
 
       expect(response.body).toEqual({ error: 'Failed to get multi-version models' });
+    });
+  });
+
+  describe('GET /single-version-models', () => {
+    it('should return models with exactly one version', async () => {
+      const mockResult = {
+        models: [
+          {
+            modelId: 2,
+            modelName: 'Single Version Model',
+            versionCount: 1,
+            versions: [
+              { modelVersionId: 20, modelVersionName: 'v1', fileName: 'c.safetensors' }
+            ]
+          }
+        ],
+        totalModels: 1,
+        totalVersions: 1
+      };
+      mockDatabaseService.getModelsWithSingleVersion.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .get('/api/v1/models/single-version-models')
+        .expect(200);
+
+      expect(mockDatabaseService.getModelsWithSingleVersion).toHaveBeenCalled();
+      expect(response.body).toEqual(mockResult);
+    });
+
+    it('should handle database service errors', async () => {
+      mockDatabaseService.getModelsWithSingleVersion.mockRejectedValue(new Error('DB error'));
+
+      const response = await request(app)
+        .get('/api/v1/models/single-version-models')
+        .expect(500);
+
+      expect(response.body).toEqual({ error: 'Failed to get single-version models' });
     });
   });
 
