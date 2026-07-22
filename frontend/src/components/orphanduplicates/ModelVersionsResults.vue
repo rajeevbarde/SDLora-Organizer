@@ -27,19 +27,29 @@
             </select>
           </label>
 
-          <label class="filter-item">
-            <span class="filter-label">Status</span>
-            <select v-model="selectedStatus" class="filter-select">
-              <option value="">All statuses</option>
-              <option
-                v-for="option in statusFilterOptions"
-                :key="option.value"
-                :value="String(option.value)"
-              >
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
+          <div class="filter-item status-filter-group">
+            <label class="filter-item-inner">
+              <span class="filter-label">Status</span>
+              <select v-model="selectedStatus" class="filter-select">
+                <option value="">All statuses</option>
+                <option
+                  v-for="option in statusFilterOptions"
+                  :key="option.value"
+                  :value="String(option.value)"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="status-all-checkbox" :class="{ disabled: !selectedStatus }">
+              <input
+                v-model="statusMatchAll"
+                type="checkbox"
+                :disabled="!selectedStatus"
+              />
+              <span>All</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -132,7 +142,8 @@ export default {
   data() {
     return {
       selectedBaseModel: '',
-      selectedStatus: ''
+      selectedStatus: '',
+      statusMatchAll: false
     };
   },
   computed: {
@@ -170,6 +181,12 @@ export default {
     models() {
       this.selectedBaseModel = '';
       this.selectedStatus = '';
+      this.statusMatchAll = false;
+    },
+    selectedStatus(newValue) {
+      if (!newValue) {
+        this.statusMatchAll = false;
+      }
     }
   },
   methods: {
@@ -185,10 +202,10 @@ export default {
 
       if (this.selectedStatus !== '') {
         const statusValue = Number(this.selectedStatus);
-        const hasStatus = versions.some(
-          version => version.isDownloaded === statusValue
-        );
-        if (!hasStatus) return false;
+        const matchesStatus = this.statusMatchAll
+          ? versions.every(version => version.isDownloaded === statusValue)
+          : versions.some(version => version.isDownloaded === statusValue);
+        if (!matchesStatus) return false;
       }
 
       return true;
@@ -306,6 +323,45 @@ export default {
   flex-direction: column;
   gap: 0.35rem;
   min-width: 200px;
+}
+
+.status-filter-group {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 0.75rem;
+  min-width: auto;
+}
+
+.filter-item-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 200px;
+}
+
+.status-all-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-bottom: 0.55rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #495057;
+  cursor: pointer;
+  user-select: none;
+}
+
+.status-all-checkbox.disabled {
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+.status-all-checkbox input {
+  cursor: pointer;
+}
+
+.status-all-checkbox.disabled input {
+  cursor: not-allowed;
 }
 
 .filter-label {
