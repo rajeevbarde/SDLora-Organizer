@@ -231,6 +231,13 @@ export const apiService = {
     return response.data;
   },
 
+  async getProfilesByPaths(paths, options = {}) {
+    const response = await api.post('/files/profile-by-paths', { paths }, {
+      signal: options.signal
+    });
+    return response.data;
+  },
+
   async getFileNameByModelVersionId(modelVersionId, options = {}) {
     const response = await api.get(`/files/filename/${modelVersionId}`, {
       signal: options.signal

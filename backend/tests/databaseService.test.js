@@ -262,6 +262,38 @@ describe('DatabaseService', () => {
     });
   });
 
+  describe('searchModelsByFilePaths', () => {
+    let connection;
+    beforeEach(() => {
+      connection = {};
+      dbPool.getConnection.mockResolvedValue(connection);
+      dbPool.getConnection.mockClear();
+      dbPool.releaseConnection.mockClear();
+      dbPool.runQuery = jest.fn();
+      dbPool.runQuery.mockClear();
+    });
+
+    it('should return null for paths with no registered file_path match', async () => {
+      dbPool.runQuery.mockResolvedValue([
+        { modelId: 1, modelVersionId: 2, file_path: 'C:/loras/other.safetensors' }
+      ]);
+
+      const result = await databaseService.searchModelsByFilePaths(['C:/loras/missing.safetensors']);
+      expect(result).toEqual({ 'C:/loras/missing.safetensors': null });
+    });
+
+    it('should match paths case-insensitively and with slash normalization', async () => {
+      dbPool.runQuery.mockResolvedValue([
+        { modelId: 10, modelVersionId: 20, file_path: 'C:\\Loras\\Foo.safetensors' }
+      ]);
+
+      const result = await databaseService.searchModelsByFilePaths(['c:/loras/foo.safetensors']);
+      expect(result).toEqual({
+        'c:/loras/foo.safetensors': { modelId: 10, modelVersionId: 20 }
+      });
+    });
+  });
+
   describe('searchModelsByFilename', () => {
     let connection;
     beforeEach(() => {

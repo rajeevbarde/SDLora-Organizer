@@ -17,7 +17,20 @@
           <td>{{ group.filename }}</td>
           <td>
             <div v-for="(path, pathIdx) in group.paths" :key="pathIdx" class="file-path-item">
-              {{ path }}
+              <div class="file-path-text">{{ path }}</div>
+              <div class="file-path-profile">
+                <template v-if="isProfileLoading(path)">...</template>
+                <a
+                  v-else-if="getProfileUrl(path)"
+                  :href="getProfileUrl(path)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="profile-link"
+                >
+                  Profile
+                </a>
+                <span v-else class="profile-not-found">cannot find</span>
+              </div>
             </div>
           </td>
           <td>
@@ -103,7 +116,24 @@
       </thead>
       <tbody>
         <tr v-for="(file, idx) in duplicateData" :key="file.fullPath + idx">
-          <td>{{ file.fullPath }}</td>
+          <td>
+            <div class="file-path-item">
+              <div class="file-path-text">{{ file.fullPath }}</div>
+              <div class="file-path-profile">
+                <template v-if="isProfileLoading(file.fullPath)">...</template>
+                <a
+                  v-else-if="getProfileUrl(file.fullPath)"
+                  :href="getProfileUrl(file.fullPath)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="profile-link"
+                >
+                  Profile
+                </a>
+                <span v-else class="profile-not-found">cannot find</span>
+              </div>
+            </div>
+          </td>
           <td>
             <button 
               class="db-check-btn" 
@@ -259,7 +289,20 @@
           <td>{{ group.filename }}</td>
           <td>
             <div v-for="(path, pathIdx) in group.paths" :key="pathIdx" class="file-path-item">
-              {{ path }}
+              <div class="file-path-text">{{ path }}</div>
+              <div class="file-path-profile">
+                <template v-if="isProfileLoading(path)">...</template>
+                <a
+                  v-else-if="getProfileUrl(path)"
+                  :href="getProfileUrl(path)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="profile-link"
+                >
+                  Profile
+                </a>
+                <span v-else class="profile-not-found">cannot find</span>
+              </div>
             </div>
           </td>
           <td>
@@ -416,6 +459,8 @@
 </template>
 
 <script>
+import { apiService } from '@/utils/api.js';
+
 export default {
   name: 'DuplicateIssuesTab',
   props: {
@@ -443,7 +488,17 @@ export default {
   },
   data() {
     return {
-      selectedActions: {}
+      selectedActions: {},
+      profileLinks: {},
+      profileLinksLoaded: false
+    }
+  },
+  watch: {
+    duplicateData: {
+      immediate: true,
+      handler() {
+        this.loadProfileLinks();
+      }
     }
   },
   emits: [
@@ -455,6 +510,45 @@ export default {
     'register-model'
   ],
   methods: {
+    collectPathsFromData() {
+      const paths = [];
+      if (this.tabType === 'db') {
+        this.duplicateData.forEach(file => {
+          if (file.fullPath) paths.push(file.fullPath);
+        });
+      } else {
+        this.duplicateData.forEach(group => {
+          (group.paths || []).forEach(path => paths.push(path));
+        });
+      }
+      return [...new Set(paths)];
+    },
+    async loadProfileLinks() {
+      const paths = this.collectPathsFromData();
+      if (paths.length === 0) {
+        this.profileLinks = {};
+        this.profileLinksLoaded = true;
+        return;
+      }
+
+      this.profileLinksLoaded = false;
+      try {
+        const data = await apiService.getProfilesByPaths(paths);
+        this.profileLinks = data.profiles || {};
+      } catch {
+        this.profileLinks = Object.fromEntries(paths.map(path => [path, null]));
+      } finally {
+        this.profileLinksLoaded = true;
+      }
+    },
+    isProfileLoading(path) {
+      return !this.profileLinksLoaded || !(path in this.profileLinks);
+    },
+    getProfileUrl(path) {
+      const profile = this.profileLinks[path];
+      if (!profile) return null;
+      return `${this.frontendBaseUrl}/model/${profile.modelId}/${profile.modelVersionId}`;
+    },
     getModelsForPath(path, filename) {
       const hashDetail = this.results.hashDetails[filename];
       if (!hashDetail) return [];
@@ -610,6 +704,31 @@ export default {
 
 .file-path-item:last-child {
   margin-bottom: 0;
+}
+
+.file-path-text {
+  word-break: break-all;
+}
+
+.file-path-profile {
+  margin-top: 0.35rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.profile-link {
+  color: #1976d2;
+  text-decoration: none;
+}
+
+.profile-link:hover {
+  text-decoration: underline;
+}
+
+.profile-not-found {
+  color: #888;
+  font-style: italic;
 }
 
 .hash-check-btn, .metadata-btn, .db-check-btn, .identify-metadata-btn, .register-btn {

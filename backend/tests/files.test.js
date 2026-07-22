@@ -137,6 +137,7 @@ describe('Files Routes', () => {
     mockDatabaseService.resetAllCivitData.mockResolvedValue({ changes: 10 });
     mockDatabaseService.runUpdateMarkAsFailed.mockResolvedValue({ changes: 1 });
     mockDatabaseService.markModelAsIgnoredAndClearPath.mockResolvedValue({ changes: 1 });
+    mockDatabaseService.searchModelsByFilePaths.mockResolvedValue({});
   });
 
   afterAll(async () => {
@@ -970,6 +971,52 @@ describe('Files Routes', () => {
           modelVersionId: 123,
           file_path: '/path/to/file.safetensors'
         })
+        .expect(500);
+
+      expect(response.body).toEqual({ error: 'Database error' });
+    });
+  });
+
+  describe('POST /profile-by-paths', () => {
+    it('should return profile links for registered paths', async () => {
+      mockDatabaseService.searchModelsByFilePaths.mockResolvedValue({
+        'C:/loras/foo.safetensors': { modelId: 1, modelVersionId: 2 },
+        'C:/loras/bar.safetensors': null
+      });
+
+      const response = await request(app)
+        .post('/api/v1/files/profile-by-paths')
+        .send({ paths: ['C:/loras/foo.safetensors', 'C:/loras/bar.safetensors'] })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        profiles: {
+          'C:/loras/foo.safetensors': { modelId: 1, modelVersionId: 2 },
+          'C:/loras/bar.safetensors': null
+        }
+      });
+      expect(mockDatabaseService.searchModelsByFilePaths).toHaveBeenCalledWith([
+        'C:/loras/foo.safetensors',
+        'C:/loras/bar.safetensors'
+      ]);
+    });
+
+    it('should handle invalid paths payload', async () => {
+      const response = await request(app)
+        .post('/api/v1/files/profile-by-paths')
+        .send({ paths: 'not-an-array' })
+        .expect(400);
+
+      expect(response.body).toEqual({ error: 'paths must be an array' });
+    });
+
+    it('should handle errors in profile-by-paths endpoint', async () => {
+      mockDatabaseService.searchModelsByFilePaths.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .post('/api/v1/files/profile-by-paths')
+        .send({ paths: ['C:/loras/foo.safetensors'] })
         .expect(500);
 
       expect(response.body).toEqual({ error: 'Database error' });

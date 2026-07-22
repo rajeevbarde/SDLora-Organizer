@@ -313,6 +313,21 @@ router.post('/unregister', async (req, res) => {
     }
 });
 
+// Resolve LoRA profile IDs by registered file_path values
+router.post('/profile-by-paths', async (req, res) => {
+    try {
+        const { paths } = req.body;
+        if (!Array.isArray(paths)) {
+            return res.status(400).json({ error: 'paths must be an array' });
+        }
+
+        const profiles = await databaseService.searchModelsByFilePaths(paths);
+        res.json({ success: true, profiles });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Read JSON file content
 router.get('/read-json', async (req, res) => {
     try {

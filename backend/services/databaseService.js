@@ -266,6 +266,46 @@ class DatabaseService {
         }
     }
 
+    // Find profile by exact registered file_path (case-insensitive, slash-normalized)
+    async searchModelsByFilePaths(filePaths) {
+        const uniquePaths = [...new Set((filePaths || []).filter(Boolean))];
+        const result = Object.fromEntries(uniquePaths.map(p => [p, null]));
+        if (uniquePaths.length === 0) {
+            return result;
+        }
+
+        const normalize = (p) => p.replace(/\\/g, '/').toLowerCase();
+        const wanted = new Map(uniquePaths.map(p => [normalize(p), p]));
+
+        let connection;
+        try {
+            connection = await dbPool.getConnection();
+            const rows = await dbPool.runQuery(
+                connection,
+                'SELECT modelId, modelVersionId, file_path FROM ALLCivitData WHERE file_path IS NOT NULL'
+            );
+
+            for (const row of rows) {
+                const key = normalize(row.file_path);
+                if (wanted.has(key)) {
+                    const originalPath = wanted.get(key);
+                    if (result[originalPath] === null) {
+                        result[originalPath] = {
+                            modelId: row.modelId,
+                            modelVersionId: row.modelVersionId
+                        };
+                    }
+                }
+            }
+
+            return result;
+        } finally {
+            if (connection) {
+                dbPool.releaseConnection(connection);
+            }
+        }
+    }
+
     // Search models by filename (case-insensitive)
     async searchModelsByFilename(filename) {
         const query = `
