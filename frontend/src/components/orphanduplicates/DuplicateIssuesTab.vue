@@ -272,20 +272,39 @@
     </table>
 
     <!-- Both Duplicates Table -->
-    <table v-else-if="tabType === 'diskdb'" class="unique-loras-table">
-      <thead>
-        <tr>
-          <th>File Name</th>
-          <th>File Paths</th>
-          <th>Hash Check</th>
-          <th>Database check</th>
-          <th>Identify metadata</th>
-          <th>Action</th>
-          <th>Result</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(group, idx) in duplicateData" :key="group.filename + idx">
+    <div v-else-if="tabType === 'diskdb'" class="diskdb-container">
+      <div v-if="!profileLinksLoaded" class="diskdb-loading">Loading profile links...</div>
+      <template v-else>
+        <div class="diskdb-filter-tabs">
+          <button
+            v-for="filter in diskdbFilters"
+            :key="filter.key"
+            type="button"
+            :class="['diskdb-filter-tab', { active: activeDiskdbFilter === filter.key }]"
+            @click="activeDiskdbFilter = filter.key"
+          >
+            {{ filter.label }}
+            <span class="diskdb-filter-count">({{ filter.count }})</span>
+          </button>
+        </div>
+        <p class="diskdb-filter-desc">{{ activeDiskdbFilterDescription }}</p>
+        <p class="diskdb-summary">
+          {{ duplicateData.length }} file names · {{ diskdbTotalPathCount }} paths
+        </p>
+        <table class="unique-loras-table">
+          <thead>
+            <tr>
+              <th>File Name</th>
+              <th>File Paths</th>
+              <th>Hash Check</th>
+              <th>Database check</th>
+              <th>Identify metadata</th>
+              <th>Action</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(group, idx) in visibleDiskdbGroups" :key="group.filename + idx">
           <td>{{ group.filename }}</td>
           <td>
             <div v-for="(path, pathIdx) in group.paths" :key="pathIdx" class="file-path-item">
@@ -450,11 +469,15 @@
                 </div>
               </div>
             </div>
-          </td>
-        </tr>
-        <tr v-if="duplicateData.length === 0"><td colspan="7" class="no-unique-files">No duplicates on disk & DB found.</td></tr>
-      </tbody>
-    </table>
+            </td>
+          </tr>
+          <tr v-if="visibleDiskdbGroups.length === 0">
+            <td colspan="7" class="no-unique-files">No items in this category.</td>
+          </tr>
+        </tbody>
+        </table>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -490,13 +513,74 @@ export default {
     return {
       selectedActions: {},
       profileLinks: {},
-      profileLinksLoaded: false
+      profileLinksLoaded: false,
+      activeDiskdbFilter: 'same'
+    }
+  },
+  computed: {
+    diskdbGroupsByCategory() {
+      const buckets = { same: [], different: [], mixed: [], remaining: [] };
+      if (this.tabType !== 'diskdb' || !this.profileLinksLoaded) {
+        return buckets;
+      }
+
+      this.duplicateData.forEach(group => {
+        const category = this.categorizeDiskdbGroup(group);
+        if (category && buckets[category]) {
+          buckets[category].push(group);
+        }
+      });
+
+      return buckets;
+    },
+    diskdbFilters() {
+      const buckets = this.diskdbGroupsByCategory;
+      return [
+        {
+          key: 'same',
+          label: 'Same profile',
+          count: buckets.same.length
+        },
+        {
+          key: 'different',
+          label: 'Different profiles',
+          count: buckets.different.length
+        },
+        {
+          key: 'mixed',
+          label: 'Mix of link & cannot find',
+          count: buckets.mixed.length
+        },
+        {
+          key: 'remaining',
+          label: 'Remaining',
+          count: buckets.remaining.length
+        }
+      ];
+    },
+    visibleDiskdbGroups() {
+      if (this.tabType !== 'diskdb') return [];
+      return this.diskdbGroupsByCategory[this.activeDiskdbFilter] || [];
+    },
+    diskdbTotalPathCount() {
+      if (this.tabType !== 'diskdb') return 0;
+      return this.duplicateData.reduce((sum, group) => sum + (group.paths?.length || 0), 0);
+    },
+    activeDiskdbFilterDescription() {
+      const descriptions = {
+        same: 'Same filename and every registered path points to the same LoRA profile — likely genuine duplicates.',
+        different: 'Same filename, but registered paths point to different LoRA profiles — not genuine duplicates.',
+        mixed: 'Same filename with a mix of registered profile links and unregistered paths.',
+        remaining: 'Same filename, but every path shows cannot find — none of the paths match a registered file_path in the database.'
+      };
+      return descriptions[this.activeDiskdbFilter] || '';
     }
   },
   watch: {
     duplicateData: {
       immediate: true,
       handler() {
+        this.activeDiskdbFilter = 'same';
         this.loadProfileLinks();
       }
     }
@@ -548,6 +632,26 @@ export default {
       const profile = this.profileLinks[path];
       if (!profile) return null;
       return `${this.frontendBaseUrl}/model/${profile.modelId}/${profile.modelVersionId}`;
+    },
+    categorizeDiskdbGroup(group) {
+      if (!group?.paths?.length) return null;
+
+      const profileKeys = group.paths.map(path => {
+        const profile = this.profileLinks[path];
+        return profile ? `${profile.modelId}/${profile.modelVersionId}` : null;
+      });
+
+      const linked = profileKeys.filter(key => key !== null);
+      const unlinkedCount = profileKeys.length - linked.length;
+
+      if (unlinkedCount > 0 && linked.length > 0) {
+        return 'mixed';
+      }
+      if (linked.length === 0) {
+        return 'remaining';
+      }
+
+      return new Set(linked).size === 1 ? 'same' : 'different';
     },
     getModelsForPath(path, filename) {
       const hashDetail = this.results.hashDetails[filename];
@@ -729,6 +833,67 @@ export default {
 .profile-not-found {
   color: #888;
   font-style: italic;
+}
+
+.diskdb-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.diskdb-loading {
+  padding: 1rem;
+  color: #666;
+  font-style: italic;
+}
+
+.diskdb-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.diskdb-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  color: #555;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.diskdb-filter-tab:hover {
+  background: #eef4ff;
+  border-color: #90caf9;
+  color: #1976d2;
+}
+
+.diskdb-filter-tab.active {
+  background: #1976d2;
+  border-color: #1976d2;
+  color: #fff;
+}
+
+.diskdb-filter-count {
+  font-weight: 600;
+}
+
+.diskdb-filter-desc {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.diskdb-summary {
+  margin: 0;
+  color: #888;
+  font-size: 0.85rem;
 }
 
 .hash-check-btn, .metadata-btn, .db-check-btn, .identify-metadata-btn, .register-btn {

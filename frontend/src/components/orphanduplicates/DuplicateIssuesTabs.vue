@@ -30,7 +30,7 @@
         >
           <span class="tab-icon">🔄</span>
           <span class="tab-text">Both</span>
-          <span class="tab-count">({{ duplicateOnDiskAndDb.length }})</span>
+          <span class="tab-count">({{ duplicateOnDiskAndDbGrouped.length }})</span>
         </button>
       </div>
       
