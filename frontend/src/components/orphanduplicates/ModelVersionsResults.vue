@@ -63,7 +63,9 @@
             <span class="filter-label">File Size</span>
             <select v-model="selectedFileSizeRange" class="filter-select">
               <option value="">All sizes</option>
-              <option value="0-250">0–250 MB</option>
+              <option value="0-50">0–50 MB</option>
+              <option value="51-150">51–150 MB</option>
+              <option value="151-250">151–250 MB</option>
               <option value="251-500">251–500 MB</option>
               <option value="501+">501+ MB</option>
             </select>
@@ -285,8 +287,12 @@ export default {
       const sizeMb = sizeKb / 1024;
 
       switch (this.selectedFileSizeRange) {
-        case '0-250':
-          return sizeMb >= 0 && sizeMb <= 250;
+        case '0-50':
+          return sizeMb >= 0 && sizeMb <= 50;
+        case '51-150':
+          return sizeMb >= 51 && sizeMb <= 150;
+        case '151-250':
+          return sizeMb >= 151 && sizeMb <= 250;
         case '251-500':
           return sizeMb >= 251 && sizeMb <= 500;
         case '501+':
