@@ -830,6 +830,7 @@ class DatabaseService {
                 basemodel,
                 isDownloaded,
                 file_path,
+                size_in_kb,
                 publishedAt
             FROM ALLCivitData
             WHERE modelId IN (
@@ -862,6 +863,7 @@ class DatabaseService {
                     basemodel: row.basemodel,
                     isDownloaded: row.isDownloaded,
                     file_path: row.file_path,
+                    size_in_kb: row.size_in_kb,
                     publishedAt: row.publishedAt
                 });
             }

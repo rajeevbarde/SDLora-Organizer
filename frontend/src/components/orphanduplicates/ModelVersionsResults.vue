@@ -15,6 +15,16 @@
         <p class="results-subtitle">{{ resultsSubtitle }}</p>
 
         <div class="filters-row">
+          <label class="filter-item search-filter-item">
+            <span class="filter-label">Search</span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="filter-search-input"
+              placeholder="Model or version name..."
+            />
+          </label>
+
           <label class="filter-item">
             <span class="filter-label">Base Model</span>
             <select v-model="selectedBaseModel" class="filter-select">
@@ -48,11 +58,21 @@
               <span>All</span>
             </label>
           </div>
+
+          <label class="filter-item">
+            <span class="filter-label">File Size</span>
+            <select v-model="selectedFileSizeRange" class="filter-select">
+              <option value="">All sizes</option>
+              <option value="0-250">0–250 MB</option>
+              <option value="251-500">251–500 MB</option>
+              <option value="501+">501+ MB</option>
+            </select>
+          </label>
         </div>
       </div>
 
       <div v-if="filteredModels.length === 0" class="no-filter-results">
-        No models match the selected filters.
+        No models match the selected filters or search.
       </div>
 
       <div v-else class="table-container">
@@ -60,7 +80,7 @@
           <thead>
             <tr>
               <th>Model</th>
-              <th>Versions, Status & Base Model</th>
+              <th>Versions, Status, Base Model & Size</th>
             </tr>
           </thead>
           <tbody>
@@ -77,14 +97,15 @@
                       target="_blank"
                       rel="noopener noreferrer"
                       class="version-link"
-                      :title="version.modelVersionName || `Version ${version.modelVersionId}`"
+                      :title="getVersionLinkTitle(version)"
                     >
-                      {{ version.modelVersionId }}
+                      {{ getVersionLinkLabel(version) }}
                     </a>
                     <span class="status-badge" :class="getStatusClass(version.isDownloaded)">
                       {{ getStatusLabel(version.isDownloaded) }}
                     </span>
                     <span class="basemodel-tag">[{{ version.basemodel || 'N/A' }}]</span>
+                    <span class="size-tag">[{{ formatSizeMB(version.size_in_kb) }}]</span>
                   </span>
                   <span v-if="index < model.versions.length - 1" class="version-separator"> / </span>
                 </template>
@@ -163,9 +184,11 @@ export default {
   },
   data() {
     return {
+      searchQuery: '',
       selectedBaseModel: '',
       selectedStatus: '',
-      statusMatchAll: false
+      statusMatchAll: false,
+      selectedFileSizeRange: ''
     };
   },
   computed: {
@@ -201,9 +224,11 @@ export default {
   },
   watch: {
     models() {
+      this.searchQuery = '';
       this.selectedBaseModel = '';
       this.selectedStatus = '';
       this.statusMatchAll = false;
+      this.selectedFileSizeRange = '';
     },
     selectedStatus(newValue) {
       if (!newValue) {
@@ -214,6 +239,18 @@ export default {
   methods: {
     modelMatchesFilters(model) {
       const versions = model.versions || [];
+
+      const normalizedSearch = this.searchQuery.trim().toLowerCase();
+      if (normalizedSearch) {
+        const modelName = (model.modelName || '').toLowerCase();
+        const matchesModelName = modelName.includes(normalizedSearch);
+        const matchesVersionName = versions.some(version =>
+          (version.modelVersionName || '').toLowerCase().includes(normalizedSearch)
+        );
+        if (!matchesModelName && !matchesVersionName) {
+          return false;
+        }
+      }
 
       if (this.selectedBaseModel) {
         const hasBaseModel = versions.some(
@@ -230,7 +267,53 @@ export default {
         if (!matchesStatus) return false;
       }
 
+      if (this.selectedFileSizeRange) {
+        const hasMatchingSize = versions.some(version =>
+          this.versionMatchesFileSizeRange(version)
+        );
+        if (!hasMatchingSize) return false;
+      }
+
       return true;
+    },
+    versionMatchesFileSizeRange(version) {
+      const sizeKb = Number(version.size_in_kb);
+      if (Number.isNaN(sizeKb)) {
+        return false;
+      }
+
+      const sizeMb = sizeKb / 1024;
+
+      switch (this.selectedFileSizeRange) {
+        case '0-250':
+          return sizeMb >= 0 && sizeMb <= 250;
+        case '251-500':
+          return sizeMb >= 251 && sizeMb <= 500;
+        case '501+':
+          return sizeMb >= 501;
+        default:
+          return true;
+      }
+    },
+    getVersionLinkLabel(version) {
+      if (version.modelVersionName) {
+        return version.modelVersionName;
+      }
+      if (version.modelVersionId) {
+        return `Version ${version.modelVersionId}`;
+      }
+      return 'Unknown version';
+    },
+    getVersionLinkTitle(version) {
+      const name = version.modelVersionName || 'Unknown version';
+      return `${name} (ID: ${version.modelVersionId})`;
+    },
+    formatSizeMB(sizeInKb) {
+      const sizeKb = Number(sizeInKb);
+      if (Number.isNaN(sizeKb)) {
+        return 'N/A';
+      }
+      return `${(sizeKb / 1024).toFixed(2)} MB`;
     },
     getProfileUrl(modelId, modelVersionId) {
       return `${this.frontendBaseUrl}/model/${modelId}/${modelVersionId}`;
@@ -345,6 +428,31 @@ export default {
   flex-direction: column;
   gap: 0.35rem;
   min-width: 200px;
+}
+
+.search-filter-item {
+  min-width: 260px;
+  flex: 1 1 260px;
+  max-width: 360px;
+}
+
+.filter-search-input {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.filter-search-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+.filter-search-input::placeholder {
+  color: #adb5bd;
 }
 
 .status-filter-group {
@@ -524,6 +632,18 @@ export default {
   padding: 0.05rem 0.25rem;
   background: #e9e9e9;
   color: #555;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.size-tag {
+  display: inline-block;
+  padding: 0.05rem 0.25rem;
+  background: #ede9fe;
+  color: #5b21b6;
   font-size: 0.72rem;
   font-weight: 700;
   font-family: inherit;
