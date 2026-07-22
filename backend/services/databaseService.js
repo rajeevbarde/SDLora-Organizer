@@ -1,7 +1,46 @@
 const { dbPool } = require('../config/database');
 const logger = require('../utils/logger');
+const pathService = require('./pathService');
 
 class DatabaseService {
+    _normalizePathForMatch(filePath) {
+        return filePath.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    }
+
+    _matchFilePathToSavedPath(filePath, savedPaths) {
+        if (!filePath || !savedPaths.length) {
+            return null;
+        }
+
+        const normalizedFilePath = this._normalizePathForMatch(filePath);
+        let bestMatch = null;
+        let bestMatchLength = 0;
+
+        for (const savedPath of savedPaths) {
+            const normalizedSavedPath = this._normalizePathForMatch(savedPath);
+            const isExactMatch = normalizedFilePath === normalizedSavedPath;
+            const isUnderSavedPath = normalizedFilePath.startsWith(`${normalizedSavedPath}/`);
+
+            if ((isExactMatch || isUnderSavedPath) && normalizedSavedPath.length > bestMatchLength) {
+                bestMatch = savedPath;
+                bestMatchLength = normalizedSavedPath.length;
+            }
+        }
+
+        return bestMatch;
+    }
+
+    _initializePathMatrix(baseModels, savedPaths) {
+        const pathMatrix = {};
+        baseModels.forEach((baseModel) => {
+            pathMatrix[baseModel] = {};
+            savedPaths.forEach((savedPath) => {
+                pathMatrix[baseModel][savedPath] = 0;
+            });
+        });
+        return pathMatrix;
+    }
+
     // Get models with pagination and filters
     async getModels(page = 1, limit = 20, filters = {}, searchQuery = null, ignoreTags = null) {
         const offset = (page - 1) * limit;
@@ -438,11 +477,30 @@ class DatabaseService {
             GROUP BY basemodel, modelVersionNsfwLevel
             ORDER BY basemodel, modelVersionNsfwLevel
         `;
+        const pathQuery = `
+            SELECT
+                basemodel,
+                file_path,
+                SUM(size_in_kb) as total_size_kb
+            FROM ALLCivitData
+            WHERE isDownloaded = 1
+                AND basemodel IS NOT NULL
+                AND basemodel != ''
+                AND file_path IS NOT NULL
+                AND file_path != ''
+            GROUP BY basemodel, file_path
+            ORDER BY basemodel, file_path
+        `;
 
         let connection;
         try {
             connection = await dbPool.getConnection();
-            const rows = await dbPool.runQuery(connection, query);
+            const [rows, pathRows, savedPathsResponse] = await Promise.all([
+                dbPool.runQuery(connection, query),
+                dbPool.runQuery(connection, pathQuery),
+                pathService.getSavedPaths()
+            ]);
+            const savedPaths = savedPathsResponse.paths || [];
             
             // Define NSFW level groups
             const nsfwGroups = {
@@ -462,15 +520,22 @@ class DatabaseService {
             rows.forEach(row => {
                 baseModels.add(row.basemodel);
             });
+            pathRows.forEach(row => {
+                baseModels.add(row.basemodel);
+            });
             
+            const sortedBaseModels = Array.from(baseModels).sort();
+
             // Initialize matrix with zeros for all groups
-            Array.from(baseModels).forEach(baseModel => {
+            sortedBaseModels.forEach(baseModel => {
                 matrix[baseModel] = {};
                 Object.keys(nsfwGroups).forEach(groupName => {
                     matrix[baseModel][groupName] = 0;
                 });
                 sizeByBaseModel[baseModel] = 0;
             });
+
+            const pathMatrix = this._initializePathMatrix(sortedBaseModels, savedPaths);
             
             // Fill in the actual counts by grouping NSFW levels
             rows.forEach(row => {
@@ -489,6 +554,13 @@ class DatabaseService {
                 // Accumulate total file size per base model (in KB)
                 sizeByBaseModel[row.basemodel] += totalSizeKB;
             });
+
+            pathRows.forEach(row => {
+                const matchedPath = this._matchFilePathToSavedPath(row.file_path, savedPaths);
+                if (matchedPath && pathMatrix[row.basemodel]) {
+                    pathMatrix[row.basemodel][matchedPath] += row.total_size_kb || 0;
+                }
+            });
             
             const grandTotalSizeKB = Object.values(sizeByBaseModel).reduce((sum, value) => sum + value, 0);
             
@@ -496,7 +568,9 @@ class DatabaseService {
             logger.logTimeTaken('Summary loading', startTime, { baseModels: baseModels.size });
             return {
                 matrix,
-                baseModels: Array.from(baseModels).sort(),
+                pathMatrix,
+                savedPaths,
+                baseModels: sortedBaseModels,
                 nsfwGroups: Object.keys(nsfwGroups),
                 sizeByBaseModel,
                 grandTotalSizeKB

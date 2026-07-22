@@ -19,9 +19,6 @@ jest.mock('sqlite3', () => ({
   })
 }));
 
-const databaseService = require('../services/databaseService');
-const dbPool = require('../config/database').dbPool;
-
 jest.mock('../config/database', () => {
   const mDbPool = {
     getConnection: jest.fn(),
@@ -31,6 +28,14 @@ jest.mock('../config/database', () => {
   };
   return { dbPool: mDbPool };
 });
+
+jest.mock('../services/pathService', () => ({
+  getSavedPaths: jest.fn().mockResolvedValue({ paths: [] })
+}));
+
+const databaseService = require('../services/databaseService');
+const pathService = require('../services/pathService');
+const dbPool = require('../config/database').dbPool;
 
 describe('DatabaseService', () => {
   describe('getModels', () => {
@@ -502,24 +507,47 @@ describe('DatabaseService', () => {
       logger.logTimeTaken.mockRestore();
     });
     it('should return download matrix with grouped NSFW levels', async () => {
-      dbPool.runQuery.mockResolvedValue([
-        { basemodel: 'SD15', modelVersionNsfwLevel: 0, count: 2 },
-        { basemodel: 'SD15', modelVersionNsfwLevel: 16, count: 1 },
-        { basemodel: 'SD21', modelVersionNsfwLevel: 32, count: 3 },
-      ]);
+      pathService.getSavedPaths.mockResolvedValue({ paths: [] });
+      dbPool.runQuery
+        .mockResolvedValueOnce([
+          { basemodel: 'SD15', modelVersionNsfwLevel: 0, count: 2 },
+          { basemodel: 'SD15', modelVersionNsfwLevel: 16, count: 1 },
+          { basemodel: 'SD21', modelVersionNsfwLevel: 32, count: 3 },
+        ])
+        .mockResolvedValueOnce([]);
       const result = await databaseService.getDownloadMatrix();
       expect(dbPool.getConnection).toHaveBeenCalled();
-      expect(dbPool.runQuery).toHaveBeenCalledWith(
-        connection,
-        expect.stringContaining('SELECT'),
-      );
+      expect(dbPool.runQuery).toHaveBeenCalledTimes(2);
       expect(dbPool.releaseConnection).toHaveBeenCalledWith(connection);
       expect(result).toHaveProperty('matrix');
+      expect(result).toHaveProperty('pathMatrix');
+      expect(result).toHaveProperty('savedPaths');
       expect(result).toHaveProperty('baseModels');
       expect(result).toHaveProperty('nsfwGroups');
       expect(result.matrix['SD15']['Safe']).toBe(2);
       expect(result.matrix['SD15']['Moderate']).toBe(1);
       expect(result.matrix['SD21']['NSFW']).toBe(3);
+    });
+
+    it('should aggregate downloaded LoRA file size per saved path and base model', async () => {
+      const savedPaths = ['Z:\\HF_lora', 'F:\\Projects\\AI\\BigFiles\\SD\\loras'];
+      pathService.getSavedPaths.mockResolvedValue({ paths: savedPaths });
+      dbPool.runQuery
+        .mockResolvedValueOnce([
+          { basemodel: 'SDXL 1.0', modelVersionNsfwLevel: 0, count: 2, total_size_kb: 3145728 },
+        ])
+        .mockResolvedValueOnce([
+          { basemodel: 'SDXL 1.0', file_path: 'Z:\\HF_lora\\model-a.safetensors', total_size_kb: 1048576 },
+          { basemodel: 'SDXL 1.0', file_path: 'F:/Projects/AI/BigFiles/SD/loras/model-b.safetensors', total_size_kb: 2097152 },
+          { basemodel: 'SDXL 1.0', file_path: 'C:\\Other\\model-c.safetensors', total_size_kb: 524288 },
+        ]);
+
+      const result = await databaseService.getDownloadMatrix();
+
+      expect(result.savedPaths).toEqual(savedPaths);
+      expect(result.pathMatrix['SDXL 1.0']['Z:\\HF_lora']).toBe(1048576);
+      expect(result.pathMatrix['SDXL 1.0']['F:\\Projects\\AI\\BigFiles\\SD\\loras']).toBe(2097152);
+      expect(result.pathMatrix['SDXL 1.0']['Z:\\HF_lora'] + result.pathMatrix['SDXL 1.0']['F:\\Projects\\AI\\BigFiles\\SD\\loras']).toBe(3145728);
     });
   });
 

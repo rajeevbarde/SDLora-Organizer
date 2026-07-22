@@ -5,7 +5,7 @@
         <span class="header-icon">📊</span>
         <div class="header-text">
           <h2 class="section-title">Registered LoRA on your hard drive</h2>
-          <p class="section-description">Overview of your Registered LoRA organized by base model and rating</p>
+          <p class="section-description">Overview of your Registered LoRA organized by base model, rating, and saved folder paths</p>
         </div>
       </div>
     </div>
@@ -36,6 +36,7 @@
                 <th v-for="nsfwGroup in matrixData.nsfwGroups" :key="nsfwGroup" class="nsfw-header">{{ nsfwGroup }}</th>
                 <th class="total-header">Total</th>
                 <th class="size-header">File Size</th>
+                <th v-if="hasSavedPaths" class="paths-list-header">Folder Paths</th>
               </tr>
             </thead>
             <tbody>
@@ -50,6 +51,17 @@
                 <td class="size-cell">
                   {{ formatFileSize(getRowTotalSize(baseModel) * 1024) }}
                 </td>
+                <td v-if="hasSavedPaths" class="paths-list-cell">
+                  <div
+                    v-for="entry in getRowPathEntries(baseModel)"
+                    :key="entry.path"
+                    class="path-entry"
+                    :class="{ 'zero-path-entry': entry.sizeKb === 0 }"
+                  >
+                    <span class="path-text">{{ entry.path }}</span>
+                    <span class="path-size">[{{ formatPathSizeGB(entry.sizeKb) }}]</span>
+                  </div>
+                </td>
               </tr>
             </tbody>
             <tfoot>
@@ -61,6 +73,17 @@
                 <td class="grand-total">{{ getGrandTotal() }}</td>
                 <td class="grand-total-size">
                   {{ formatFileSize(getGrandTotalSize() * 1024) }}
+                </td>
+                <td v-if="hasSavedPaths" class="paths-list-footer-cell">
+                  <div
+                    v-for="entry in getFooterPathEntries()"
+                    :key="entry.path"
+                    class="path-entry"
+                    :class="{ 'zero-path-entry': entry.sizeKb === 0 }"
+                  >
+                    <span class="path-text">{{ entry.path }}</span>
+                    <span class="path-size">[{{ formatPathSizeGB(entry.sizeKb) }}]</span>
+                  </div>
                 </td>
               </tr>
             </tfoot>
@@ -88,8 +111,39 @@ export default {
     loading: Boolean,
     error: String
   },
+  computed: {
+    hasSavedPaths() {
+      return (this.matrixData?.savedPaths || []).length > 0;
+    }
+  },
   methods: {
     formatFileSize,
+    formatPathSizeGB(sizeKb) {
+      const gb = (sizeKb || 0) / (1024 * 1024);
+      return `${gb.toFixed(2)} GB`;
+    },
+    getPathSizeKb(baseModel, savedPath) {
+      if (!this.matrixData?.pathMatrix?.[baseModel]) return 0;
+      return this.matrixData.pathMatrix[baseModel][savedPath] || 0;
+    },
+    getRowPathEntries(baseModel) {
+      return (this.matrixData?.savedPaths || []).map((path) => ({
+        path,
+        sizeKb: this.getPathSizeKb(baseModel, path)
+      }));
+    },
+    getFooterPathEntries() {
+      return (this.matrixData?.savedPaths || []).map((path) => ({
+        path,
+        sizeKb: this.getPathColumnTotalSizeKb(path)
+      }));
+    },
+    getPathColumnTotalSizeKb(savedPath) {
+      if (!this.matrixData) return 0;
+      return this.matrixData.baseModels.reduce((total, baseModel) => {
+        return total + this.getPathSizeKb(baseModel, savedPath);
+      }, 0);
+    },
     getRowTotal(baseModel) {
       if (!this.matrixData) return 0;
       return this.matrixData.nsfwGroups.reduce((total, nsfwGroup) => {
@@ -341,6 +395,14 @@ export default {
   color: #4c1d95 !important;
   font-size: 0.9rem !important;
 }
+.paths-list-header {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%) !important;
+  font-weight: 700 !important;
+  min-width: 320px;
+  color: #9a3412 !important;
+  font-size: 0.9rem !important;
+  text-align: left !important;
+}
 .base-model-cell {
   text-align: left !important;
   font-weight: 600;
@@ -368,6 +430,48 @@ export default {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   font-weight: 400;
   opacity: 0.7;
+}
+.paths-list-cell,
+.paths-list-footer-cell {
+  text-align: left !important;
+  vertical-align: top;
+  background: linear-gradient(135deg, #fffaf5 0%, #fff7ed 100%);
+  min-width: 320px;
+  max-width: 480px;
+}
+.paths-list-footer-cell {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+}
+.path-entry {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  border-bottom: 1px solid rgba(154, 52, 18, 0.08);
+}
+.path-entry:last-child {
+  border-bottom: none;
+}
+.path-text {
+  flex: 1;
+  color: #7c2d12;
+  word-break: break-all;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+.path-size {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #9a3412;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+.zero-path-entry {
+  opacity: 0.55;
+}
+.zero-path-entry .path-size {
+  font-weight: 500;
 }
 .total-cell {
   background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
