@@ -39,22 +39,6 @@
       </div>
       
       <div class="button-group">
-        <button 
-          @click="$emit('scan-bad-downloads')"
-          :disabled="badDownloadsLoading"
-          class="control-btn tertiary-btn"
-        >
-          <span class="btn-icon">⚠️</span>
-          <span class="btn-text">{{ badDownloadsLoading ? 'Scanning...' : 'Bad Downloads' }}</span>
-        </button>
-        
-        <div v-if="badDownloadsLoading || badDownloadsTimer > 0" class="timer-display">
-          <span class="timer-icon">⏱️</span>
-          <span class="timer-text">{{ badDownloadsTimer.toFixed(2) }}s</span>
-        </div>
-      </div>
-
-      <div class="button-group">
         <button
           @click="$emit('scan-model-versions')"
           :disabled="modelVersionsLoading"
@@ -116,14 +100,6 @@ export default {
       type: Number,
       default: 0
     },
-    badDownloadsLoading: {
-      type: Boolean,
-      default: false
-    },
-    badDownloadsTimer: {
-      type: Number,
-      default: 0
-    },
     modelVersionsLoading: {
       type: Boolean,
       default: false
@@ -144,7 +120,6 @@ export default {
   emits: [
     'scan-orphan-files',
     'scan-duplicate-issues',
-    'scan-bad-downloads',
     'scan-model-versions',
     'scan-single-model-version'
   ]
@@ -263,22 +238,6 @@ export default {
 }
 
 .secondary-btn:disabled {
-  background: #b8c2cc;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.tertiary-btn {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-  color: white;
-}
-
-.tertiary-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff5252 0%, #e74c3c 100%);
-}
-
-.tertiary-btn:disabled {
   background: #b8c2cc;
   cursor: not-allowed;
   transform: none;
