@@ -322,6 +322,14 @@ export const apiService = {
     return response.data;
   },
 
+  // Delete file from disk and mark as ignored (isDownloaded=4, file_path=null)
+  async removeFromDiskAndIgnore({ modelVersionId, file_path }, options = {}) {
+    const response = await api.post('/files/remove-and-ignore', { modelVersionId, file_path }, {
+      signal: options.signal
+    });
+    return response.data;
+  },
+
   // Unregister file (set isdownloaded=0, file_path=null) - for files not found on disk
   async unregisterFile({ modelVersionId }, options = {}) {
     const response = await api.post('/files/unregister', { modelVersionId }, {

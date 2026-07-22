@@ -636,4 +636,28 @@ describe('DatabaseService', () => {
       expect(result).toEqual({ affectedRows: 1 });
     });
   });
+
+  describe('markModelAsIgnoredAndClearPath', () => {
+    let connection;
+    beforeEach(() => {
+      connection = {};
+      dbPool.getConnection.mockResolvedValue(connection);
+      dbPool.getConnection.mockClear();
+      dbPool.releaseConnection.mockClear();
+      dbPool.runUpdate = jest.fn();
+      dbPool.runUpdate.mockClear();
+    });
+    it('should mark as ignored and clear file_path', async () => {
+      dbPool.runUpdate.mockResolvedValue({ affectedRows: 1 });
+      const result = await databaseService.markModelAsIgnoredAndClearPath(10);
+      expect(dbPool.getConnection).toHaveBeenCalled();
+      expect(dbPool.runUpdate).toHaveBeenCalledWith(
+        connection,
+        expect.stringContaining('UPDATE ALLCivitData SET isDownloaded = 4, file_path = NULL'),
+        [10]
+      );
+      expect(dbPool.releaseConnection).toHaveBeenCalledWith(connection);
+      expect(result).toEqual({ affectedRows: 1 });
+    });
+  });
 }); 

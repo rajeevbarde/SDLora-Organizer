@@ -270,6 +270,34 @@ router.post('/delete-and-fail', async (req, res) => {
     }
 });
 
+// Delete file from disk and mark as ignored (isDownloaded=4, file_path=null)
+router.post('/remove-and-ignore', async (req, res) => {
+    try {
+        const { modelVersionId, file_path } = req.body;
+        if (!modelVersionId || !file_path) {
+            return res.status(400).json({ error: 'modelVersionId and file_path are required' });
+        }
+
+        const fs = require('fs');
+        let fileDeleted = false;
+        if (fs.existsSync(file_path)) {
+            fs.unlinkSync(file_path);
+            fileDeleted = true;
+        }
+
+        await databaseService.markModelAsIgnoredAndClearPath(modelVersionId);
+        res.json({
+            success: true,
+            message: fileDeleted
+                ? 'File removed from disk and model marked as ignored'
+                : 'File not found on disk; model marked as ignored',
+            fileDeleted
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Unregister file (set isdownloaded=0, file_path=null) - for files not found on disk
 router.post('/unregister', async (req, res) => {
     try {

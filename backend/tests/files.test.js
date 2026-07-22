@@ -136,6 +136,7 @@ describe('Files Routes', () => {
     mockDatabaseService.getLatestPublishedAt.mockResolvedValue('2023-01-01');
     mockDatabaseService.resetAllCivitData.mockResolvedValue({ changes: 10 });
     mockDatabaseService.runUpdateMarkAsFailed.mockResolvedValue({ changes: 1 });
+    mockDatabaseService.markModelAsIgnoredAndClearPath.mockResolvedValue({ changes: 1 });
   });
 
   afterAll(async () => {
@@ -900,6 +901,78 @@ describe('Files Routes', () => {
         .expect(500);
 
       expect(response.body).toEqual({ error: 'Delete error' });
+    });
+  });
+
+  describe('POST /remove-and-ignore', () => {
+    it('should delete file and mark as ignored successfully', async () => {
+      const fs = require('fs');
+      fs.existsSync.mockReturnValue(true);
+      fs.unlinkSync.mockImplementation(() => {});
+
+      const response = await request(app)
+        .post('/api/v1/files/remove-and-ignore')
+        .send({
+          modelVersionId: 123,
+          file_path: '/path/to/file.safetensors'
+        })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        message: 'File removed from disk and model marked as ignored',
+        fileDeleted: true
+      });
+      expect(fs.existsSync).toHaveBeenCalledWith('/path/to/file.safetensors');
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/path/to/file.safetensors');
+      expect(mockDatabaseService.markModelAsIgnoredAndClearPath).toHaveBeenCalledWith(123);
+    });
+
+    it('should mark as ignored when file is not found on disk', async () => {
+      const fs = require('fs');
+      fs.existsSync.mockReturnValue(false);
+
+      const response = await request(app)
+        .post('/api/v1/files/remove-and-ignore')
+        .send({
+          modelVersionId: 123,
+          file_path: '/nonexistent/file.safetensors'
+        })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        message: 'File not found on disk; model marked as ignored',
+        fileDeleted: false
+      });
+      expect(fs.unlinkSync).not.toHaveBeenCalled();
+      expect(mockDatabaseService.markModelAsIgnoredAndClearPath).toHaveBeenCalledWith(123);
+    });
+
+    it('should handle missing required fields error', async () => {
+      const response = await request(app)
+        .post('/api/v1/files/remove-and-ignore')
+        .send({ modelVersionId: 123 })
+        .expect(400);
+
+      expect(response.body).toEqual({ error: 'modelVersionId and file_path are required' });
+    });
+
+    it('should handle errors in remove-and-ignore endpoint', async () => {
+      const fs = require('fs');
+      fs.existsSync.mockReturnValue(true);
+      fs.unlinkSync.mockImplementation(() => {});
+      mockDatabaseService.markModelAsIgnoredAndClearPath.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .post('/api/v1/files/remove-and-ignore')
+        .send({
+          modelVersionId: 123,
+          file_path: '/path/to/file.safetensors'
+        })
+        .expect(500);
+
+      expect(response.body).toEqual({ error: 'Database error' });
     });
   });
 

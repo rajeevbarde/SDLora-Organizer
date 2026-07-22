@@ -90,6 +90,16 @@
                 @download="downloadModelFile"
                 @ignore="ignoreModel"
               />
+              <button
+                v-if="showRemoveFromDiskButton"
+                type="button"
+                class="remove-disk-btn"
+                :disabled="removingFromDisk"
+                @click="removeFromDiskAndIgnore"
+              >
+                <LoadingSpinner v-if="removingFromDisk" :loading="true" message="" size="small" class="spinner" />
+                <span>{{ removingFromDisk ? 'Removing...' : 'Remove from disk & ignore' }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -308,8 +318,15 @@ export default {
       pollingInterval: null,
       pollCount: 0,
       maxPolls: 300, // 10 minutes at 2s interval
-      relatedLora: []
+      relatedLora: [],
+      removingFromDisk: false
     };
+  },
+  computed: {
+    showRemoveFromDiskButton() {
+      if (!this.model) return false;
+      return this.model.isDownloaded === this.DOWNLOAD_STATUS.DOWNLOADED;
+    }
   },
   mounted() {
     this.fetchModelDetails();
@@ -476,6 +493,34 @@ export default {
         this.showNotification('Model ignored successfully.', 'success');
       } catch (err) {
         this.showNotification('Failed to ignore model.', 'error');
+      }
+    },
+
+    async removeFromDiskAndIgnore() {
+      if (!this.model?.modelVersionId || !this.model?.file_path) return;
+
+      const fileName = this.model.fileName || 'this file';
+      const confirmed = window.confirm(
+        `Delete "${fileName}" from disk and mark as ignored?\n\nPath: ${this.model.file_path}\n\nThis cannot be undone.`
+      );
+      if (!confirmed) return;
+
+      this.removingFromDisk = true;
+      try {
+        const result = await apiService.removeFromDiskAndIgnore({
+          modelVersionId: this.model.modelVersionId,
+          file_path: this.model.file_path
+        });
+        this.model.isDownloaded = DOWNLOAD_STATUS.IGNORED;
+        this.model.file_path = null;
+        this.showNotification(result.message || 'Removed from disk and marked as ignored.', 'success');
+      } catch (err) {
+        this.showNotification(
+          err.response?.data?.error || err.message || 'Failed to remove from disk.',
+          'error'
+        );
+      } finally {
+        this.removingFromDisk = false;
       }
     },
     
@@ -942,6 +987,35 @@ export default {
   padding: 0.5rem 1rem !important;
   border-radius: 6px !important;
   border: 1px solid rgba(255, 152, 0, 0.3) !important;
+}
+
+.remove-disk-btn {
+  min-width: 180px;
+  height: 40px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: #dc3545;
+  border: 1px solid #c82333;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  transition: background 0.2s;
+}
+
+.remove-disk-btn:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.remove-disk-btn:disabled {
+  background: #6c757d;
+  border-color: #6c757d;
+  cursor: not-allowed;
 }
 
 
