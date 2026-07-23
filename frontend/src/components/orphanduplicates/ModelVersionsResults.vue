@@ -25,15 +25,25 @@
             />
           </label>
 
-          <label class="filter-item">
-            <span class="filter-label">Base Model</span>
-            <select v-model="selectedBaseModel" class="filter-select">
-              <option value="">All base models</option>
-              <option v-for="baseModel in availableBaseModels" :key="baseModel" :value="baseModel">
-                {{ baseModel }}
-              </option>
-            </select>
-          </label>
+          <div class="filter-item base-model-filter-group">
+            <label class="filter-item-inner">
+              <span class="filter-label">Base Model</span>
+              <select v-model="selectedBaseModel" class="filter-select">
+                <option value="">All base models</option>
+                <option v-for="baseModel in availableBaseModels" :key="baseModel" :value="baseModel">
+                  {{ baseModel }}
+                </option>
+              </select>
+            </label>
+            <label class="filter-inline-checkbox" :class="{ disabled: !selectedBaseModel }">
+              <input
+                v-model="baseModelOnly"
+                type="checkbox"
+                :disabled="!selectedBaseModel"
+              />
+              <span>Only</span>
+            </label>
+          </div>
 
           <div class="filter-item status-filter-group">
             <label class="filter-item-inner">
@@ -49,7 +59,7 @@
                 </option>
               </select>
             </label>
-            <label class="status-all-checkbox" :class="{ disabled: !selectedStatus }">
+            <label class="filter-inline-checkbox" :class="{ disabled: !selectedStatus }">
               <input
                 v-model="statusMatchAll"
                 type="checkbox"
@@ -188,6 +198,7 @@ export default {
     return {
       searchQuery: '',
       selectedBaseModel: '',
+      baseModelOnly: false,
       selectedStatus: '',
       statusMatchAll: false,
       selectedFileSizeRange: ''
@@ -228,9 +239,15 @@ export default {
     models() {
       this.searchQuery = '';
       this.selectedBaseModel = '';
+      this.baseModelOnly = false;
       this.selectedStatus = '';
       this.statusMatchAll = false;
       this.selectedFileSizeRange = '';
+    },
+    selectedBaseModel(newValue) {
+      if (!newValue) {
+        this.baseModelOnly = false;
+      }
     },
     selectedStatus(newValue) {
       if (!newValue) {
@@ -239,6 +256,12 @@ export default {
     }
   },
   methods: {
+    getScopedVersions(versions) {
+      if (this.baseModelOnly && this.selectedBaseModel) {
+        return versions.filter(version => version.basemodel === this.selectedBaseModel);
+      }
+      return versions;
+    },
     modelMatchesFilters(model) {
       const versions = model.versions || [];
 
@@ -261,16 +284,18 @@ export default {
         if (!hasBaseModel) return false;
       }
 
+      const scopedVersions = this.getScopedVersions(versions);
+
       if (this.selectedStatus !== '') {
         const statusValue = Number(this.selectedStatus);
         const matchesStatus = this.statusMatchAll
-          ? versions.every(version => version.isDownloaded === statusValue)
-          : versions.some(version => version.isDownloaded === statusValue);
+          ? scopedVersions.every(version => version.isDownloaded === statusValue)
+          : scopedVersions.some(version => version.isDownloaded === statusValue);
         if (!matchesStatus) return false;
       }
 
       if (this.selectedFileSizeRange) {
-        const hasMatchingSize = versions.some(version =>
+        const hasMatchingSize = scopedVersions.some(version =>
           this.versionMatchesFileSizeRange(version)
         );
         if (!hasMatchingSize) return false;
@@ -461,7 +486,8 @@ export default {
   color: #adb5bd;
 }
 
-.status-filter-group {
+.status-filter-group,
+.base-model-filter-group {
   flex-direction: row;
   align-items: flex-end;
   gap: 0.75rem;
@@ -475,7 +501,7 @@ export default {
   min-width: 200px;
 }
 
-.status-all-checkbox {
+.filter-inline-checkbox {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -487,16 +513,16 @@ export default {
   user-select: none;
 }
 
-.status-all-checkbox.disabled {
+.filter-inline-checkbox.disabled {
   color: #adb5bd;
   cursor: not-allowed;
 }
 
-.status-all-checkbox input {
+.filter-inline-checkbox input {
   cursor: pointer;
 }
 
-.status-all-checkbox.disabled input {
+.filter-inline-checkbox.disabled input {
   cursor: not-allowed;
 }
 
