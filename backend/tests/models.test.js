@@ -34,6 +34,7 @@ const mockDatabaseService = {
   getAllCivitDataRowCount: jest.fn(),
   getRelatedLoraByModelId: jest.fn(),
   markModelAsIgnored: jest.fn(),
+  markModelAsArchived: jest.fn(),
   getModelsWithMultipleVersions: jest.fn(),
   getModelsWithSingleVersion: jest.fn()
 };
@@ -509,6 +510,78 @@ describe('Models Routes', () => {
         .expect(500);
 
       expect(response.body).toEqual({ error: errorMessage });
+    });
+  });
+
+  describe('POST /archive', () => {
+    it('should mark model as archived successfully', async () => {
+      mockDatabaseService.getModelDetail.mockResolvedValue({ isDownloaded: 4 });
+      mockDatabaseService.markModelAsArchived.mockResolvedValue({ changes: 1 });
+
+      const response = await request(app)
+        .post('/api/v1/models/archive')
+        .send({ modelVersionId: 123 })
+        .expect(200);
+
+      expect(mockDatabaseService.getModelDetail).toHaveBeenCalledWith(123);
+      expect(mockDatabaseService.markModelAsArchived).toHaveBeenCalledWith(123);
+      expect(response.body).toEqual({ success: true });
+    });
+
+    it('should return success when model is already archived', async () => {
+      mockDatabaseService.getModelDetail.mockResolvedValue({ isDownloaded: 5 });
+
+      const response = await request(app)
+        .post('/api/v1/models/archive')
+        .send({ modelVersionId: 123 })
+        .expect(200);
+
+      expect(mockDatabaseService.markModelAsArchived).not.toHaveBeenCalled();
+      expect(response.body).toEqual({ success: true, alreadyArchived: true });
+    });
+
+    it('should reject archiving a downloaded model', async () => {
+      mockDatabaseService.getModelDetail.mockResolvedValue({ isDownloaded: 1 });
+
+      const response = await request(app)
+        .post('/api/v1/models/archive')
+        .send({ modelVersionId: 123 })
+        .expect(400);
+
+      expect(mockDatabaseService.markModelAsArchived).not.toHaveBeenCalled();
+      expect(response.body).toEqual({ error: 'Cannot archive a downloaded or downloading model' });
+    });
+
+    it('should return 400 when modelVersionId is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/models/archive')
+        .send({})
+        .expect(400);
+
+      expect(response.body).toEqual({ error: 'modelVersionId is required' });
+    });
+
+    it('should return 404 when model is not found', async () => {
+      mockDatabaseService.getModelDetail.mockResolvedValue(null);
+
+      const response = await request(app)
+        .post('/api/v1/models/archive')
+        .send({ modelVersionId: 123 })
+        .expect(404);
+
+      expect(response.body).toEqual({ error: 'Model not found' });
+    });
+
+    it('should handle database service errors', async () => {
+      mockDatabaseService.getModelDetail.mockResolvedValue({ isDownloaded: 0 });
+      mockDatabaseService.markModelAsArchived.mockRejectedValue(new Error('Archive error'));
+
+      const response = await request(app)
+        .post('/api/v1/models/archive')
+        .send({ modelVersionId: 123 })
+        .expect(500);
+
+      expect(response.body).toEqual({ error: 'Archive error' });
     });
   });
 }); 

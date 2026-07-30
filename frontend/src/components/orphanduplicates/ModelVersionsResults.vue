@@ -43,6 +43,14 @@
               />
               <span>Only</span>
             </label>
+            <label class="filter-inline-checkbox" :class="{ disabled: !selectedBaseModel }">
+              <input
+                v-model="baseModelOnlyTwoPlus"
+                type="checkbox"
+                :disabled="!selectedBaseModel"
+              />
+              <span>Only 2+</span>
+            </label>
           </div>
 
           <div class="filter-item status-filter-group">
@@ -69,17 +77,27 @@
             </label>
           </div>
 
-          <label class="filter-item">
-            <span class="filter-label">File Size</span>
-            <select v-model="selectedFileSizeRange" class="filter-select">
-              <option value="">All sizes</option>
-              <option value="0-50">0–50 MB</option>
-              <option value="51-150">51–150 MB</option>
-              <option value="151-250">151–250 MB</option>
-              <option value="251-500">251–500 MB</option>
-              <option value="501+">501+ MB</option>
-            </select>
-          </label>
+          <div class="filter-item file-size-filter-group">
+            <label class="filter-item-inner">
+              <span class="filter-label">File Size</span>
+              <select v-model="selectedFileSizeRange" class="filter-select">
+                <option value="">All sizes</option>
+                <option value="0-50">0–50 MB</option>
+                <option value="51-150">51–150 MB</option>
+                <option value="151-250">151–250 MB</option>
+                <option value="251-500">251–500 MB</option>
+                <option value="501+">501+ MB</option>
+              </select>
+            </label>
+            <label class="filter-inline-checkbox" :class="{ disabled: !selectedFileSizeRange }">
+              <input
+                v-model="fileSizeOnly"
+                type="checkbox"
+                :disabled="!selectedFileSizeRange"
+              />
+              <span>Only</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -199,9 +217,11 @@ export default {
       searchQuery: '',
       selectedBaseModel: '',
       baseModelOnly: false,
+      baseModelOnlyTwoPlus: false,
       selectedStatus: '',
       statusMatchAll: false,
-      selectedFileSizeRange: ''
+      selectedFileSizeRange: '',
+      fileSizeOnly: false
     };
   },
   computed: {
@@ -211,7 +231,8 @@ export default {
         { value: DOWNLOAD_STATUS.DOWNLOADED, label: 'Downloaded' },
         { value: DOWNLOAD_STATUS.DOWNLOADING, label: 'Downloading' },
         { value: DOWNLOAD_STATUS.FAILED, label: 'Failed' },
-        { value: DOWNLOAD_STATUS.IGNORED, label: 'Ignored' }
+        { value: DOWNLOAD_STATUS.IGNORED, label: 'Ignored' },
+        { value: DOWNLOAD_STATUS.ARCHIVED, label: 'Archived' }
       ];
     },
     availableBaseModels() {
@@ -240,18 +261,26 @@ export default {
       this.searchQuery = '';
       this.selectedBaseModel = '';
       this.baseModelOnly = false;
+      this.baseModelOnlyTwoPlus = false;
       this.selectedStatus = '';
       this.statusMatchAll = false;
       this.selectedFileSizeRange = '';
+      this.fileSizeOnly = false;
     },
     selectedBaseModel(newValue) {
       if (!newValue) {
         this.baseModelOnly = false;
+        this.baseModelOnlyTwoPlus = false;
       }
     },
     selectedStatus(newValue) {
       if (!newValue) {
         this.statusMatchAll = false;
+      }
+    },
+    selectedFileSizeRange(newValue) {
+      if (!newValue) {
+        this.fileSizeOnly = false;
       }
     }
   },
@@ -261,6 +290,28 @@ export default {
         return versions.filter(version => version.basemodel === this.selectedBaseModel);
       }
       return versions;
+    },
+    countDownloadedBaseModelVersions(versions) {
+      if (!this.selectedBaseModel) {
+        return 0;
+      }
+
+      return versions.filter(
+        version =>
+          version.basemodel === this.selectedBaseModel
+          && version.isDownloaded === DOWNLOAD_STATUS.DOWNLOADED
+      ).length;
+    },
+    versionMatchesStatusFilter(version) {
+      if (this.selectedStatus === '') {
+        return true;
+      }
+
+      return version.isDownloaded === Number(this.selectedStatus);
+    },
+    versionMatchesStatusAndFileSize(version) {
+      return this.versionMatchesStatusFilter(version)
+        && this.versionMatchesFileSizeRange(version);
     },
     modelMatchesFilters(model) {
       const versions = model.versions || [];
@@ -284,21 +335,39 @@ export default {
         if (!hasBaseModel) return false;
       }
 
-      const scopedVersions = this.getScopedVersions(versions);
-
-      if (this.selectedStatus !== '') {
-        const statusValue = Number(this.selectedStatus);
-        const matchesStatus = this.statusMatchAll
-          ? scopedVersions.every(version => version.isDownloaded === statusValue)
-          : scopedVersions.some(version => version.isDownloaded === statusValue);
-        if (!matchesStatus) return false;
+      if (this.baseModelOnlyTwoPlus && this.selectedBaseModel) {
+        if (this.countDownloadedBaseModelVersions(versions) < 2) {
+          return false;
+        }
       }
 
-      if (this.selectedFileSizeRange) {
-        const hasMatchingSize = scopedVersions.some(version =>
-          this.versionMatchesFileSizeRange(version)
-        );
-        if (!hasMatchingSize) return false;
+      const scopedVersions = this.getScopedVersions(versions);
+      const useCombinedStatusAndSize = this.fileSizeOnly && this.selectedFileSizeRange;
+
+      if (useCombinedStatusAndSize) {
+        if (this.selectedStatus !== '') {
+          const matchesCombined = this.statusMatchAll
+            ? scopedVersions.every(version => this.versionMatchesStatusAndFileSize(version))
+            : scopedVersions.some(version => this.versionMatchesStatusAndFileSize(version));
+          if (!matchesCombined) return false;
+        } else if (!scopedVersions.some(version => this.versionMatchesFileSizeRange(version))) {
+          return false;
+        }
+      } else {
+        if (this.selectedStatus !== '') {
+          const statusValue = Number(this.selectedStatus);
+          const matchesStatus = this.statusMatchAll
+            ? scopedVersions.every(version => version.isDownloaded === statusValue)
+            : scopedVersions.some(version => version.isDownloaded === statusValue);
+          if (!matchesStatus) return false;
+        }
+
+        if (this.selectedFileSizeRange) {
+          const hasMatchingSize = scopedVersions.some(version =>
+            this.versionMatchesFileSizeRange(version)
+          );
+          if (!hasMatchingSize) return false;
+        }
       }
 
       return true;
@@ -355,6 +424,7 @@ export default {
         case DOWNLOAD_STATUS.DOWNLOADING: return 'Downloading';
         case DOWNLOAD_STATUS.FAILED: return 'Failed';
         case DOWNLOAD_STATUS.IGNORED: return 'Ignored';
+        case DOWNLOAD_STATUS.ARCHIVED: return 'Archived';
         default: return 'Not downloaded';
       }
     },
@@ -364,6 +434,7 @@ export default {
         case DOWNLOAD_STATUS.DOWNLOADING: return 'status-downloading';
         case DOWNLOAD_STATUS.FAILED: return 'status-failed';
         case DOWNLOAD_STATUS.IGNORED: return 'status-ignored';
+        case DOWNLOAD_STATUS.ARCHIVED: return 'status-archived';
         default: return 'status-not-downloaded';
       }
     }
@@ -487,7 +558,8 @@ export default {
 }
 
 .status-filter-group,
-.base-model-filter-group {
+.base-model-filter-group,
+.file-size-filter-group {
   flex-direction: row;
   align-items: flex-end;
   gap: 0.75rem;

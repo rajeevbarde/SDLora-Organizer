@@ -769,4 +769,28 @@ describe('DatabaseService', () => {
       expect(result).toEqual({ affectedRows: 1 });
     });
   });
+
+  describe('markModelAsArchived', () => {
+    let connection;
+    beforeEach(() => {
+      connection = {};
+      dbPool.getConnection.mockResolvedValue(connection);
+      dbPool.getConnection.mockClear();
+      dbPool.releaseConnection.mockClear();
+      dbPool.runUpdate = jest.fn();
+      dbPool.runUpdate.mockClear();
+    });
+    it('should mark model as archived', async () => {
+      dbPool.runUpdate.mockResolvedValue({ affectedRows: 1 });
+      const result = await databaseService.markModelAsArchived(11);
+      expect(dbPool.getConnection).toHaveBeenCalled();
+      expect(dbPool.runUpdate).toHaveBeenCalledWith(
+        connection,
+        expect.stringContaining('UPDATE ALLCivitData SET isDownloaded = 5'),
+        [11]
+      );
+      expect(dbPool.releaseConnection).toHaveBeenCalledWith(connection);
+      expect(result).toEqual({ affectedRows: 1 });
+    });
+  });
 }); 

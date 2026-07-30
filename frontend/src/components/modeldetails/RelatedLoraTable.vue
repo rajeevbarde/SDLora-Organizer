@@ -39,6 +39,7 @@
             <span v-else-if="item.isDownloaded === downloadStatus.DOWNLOADING" class="status-downloading">Downloading</span>
             <span v-else-if="item.isDownloaded === downloadStatus.FAILED" class="status-failed">Failed</span>
             <span v-else-if="item.isDownloaded === downloadStatus.IGNORED" class="status-ignored">Ignored</span>
+            <span v-else-if="item.isDownloaded === downloadStatus.ARCHIVED" class="status-archived">Archived</span>
             <span v-else class="status-not-downloaded">Not Downloaded</span>
           </td>
         </tr>
@@ -220,6 +221,11 @@ export default {
 
 .status-ignored {
   color: #b85c00;
+  font-weight: 600;
+}
+
+.status-archived {
+  color: #00838f;
   font-weight: 600;
 }
 

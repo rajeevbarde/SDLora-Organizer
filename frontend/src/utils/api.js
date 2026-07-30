@@ -368,6 +368,15 @@ export const apiService = {
     return response.data;
   },
 
+  // Mark model as archived (isDownloaded = 5)
+  async archiveModel(modelVersionId) {
+    const response = await api.post('/models/archive', { modelVersionId });
+    if (!response.data || response.data.success !== true) {
+      throw new Error('Failed to archive model');
+    }
+    return response.data;
+  },
+
   // Read JSON file content
   async readJsonFile(filePath, options = {}) {
     const response = await api.get('/files/read-json', {

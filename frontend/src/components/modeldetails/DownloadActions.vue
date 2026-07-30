@@ -33,6 +33,7 @@
     
     <span v-else-if="showDownloadedStatus" class="status-downloaded">Downloaded</span>
     <span v-else-if="showIgnoredStatus" class="status-ignored">Ignored</span>
+    <span v-else-if="showArchivedStatus" class="status-archived">Archived</span>
   </div>
 </template>
 
@@ -62,14 +63,17 @@ export default {
       return this.model.fileDownloadUrl && 
              this.model.isDownloaded !== this.downloadStatus.DOWNLOADED && 
              this.model.isDownloaded !== this.downloadStatus.DOWNLOADING && 
-             this.model.isDownloaded !== this.downloadStatus.FAILED;
+             this.model.isDownloaded !== this.downloadStatus.FAILED &&
+             this.model.isDownloaded !== this.downloadStatus.IGNORED &&
+             this.model.isDownloaded !== this.downloadStatus.ARCHIVED;
     },
     showIgnoreButton() {
       return this.model.fileDownloadUrl && 
              this.model.isDownloaded !== this.downloadStatus.DOWNLOADED && 
              this.model.isDownloaded !== this.downloadStatus.DOWNLOADING && 
              this.model.isDownloaded !== this.downloadStatus.FAILED && 
-             this.model.isDownloaded !== this.downloadStatus.IGNORED;
+             this.model.isDownloaded !== this.downloadStatus.IGNORED &&
+             this.model.isDownloaded !== this.downloadStatus.ARCHIVED;
     },
     showRetryButton() {
       return this.model.fileDownloadUrl && 
@@ -81,6 +85,9 @@ export default {
     },
     showIgnoredStatus() {
       return this.model.isDownloaded === this.downloadStatus.IGNORED;
+    },
+    showArchivedStatus() {
+      return this.model.isDownloaded === this.downloadStatus.ARCHIVED;
     }
   }
 };
@@ -154,6 +161,12 @@ export default {
 
 .status-ignored {
   color: #b85c00;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.status-archived {
+  color: #00838f;
   font-weight: 600;
   margin-left: 10px;
 }

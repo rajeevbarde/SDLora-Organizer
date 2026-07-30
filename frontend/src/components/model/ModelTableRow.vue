@@ -26,7 +26,7 @@
     </td>
     <td class="filename-cell">{{ model.fileName }}</td>
     <td class="download-cell">
-      <button v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED" 
+      <button v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED && model.isDownloaded !== DOWNLOAD_STATUS.ARCHIVED" 
               @click="downloadModelFile(model)" 
               class="download-btn"
               :disabled="isModelDownloading(model.modelId)"
@@ -34,7 +34,7 @@
         <span class="btn-icon">⬇️</span>
         <span class="btn-text">{{ isModelDownloading(model.modelId) ? 'Downloading...' : 'Download' }}</span>
       </button>
-      <button v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED"
+      <button v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED && model.isDownloaded !== DOWNLOAD_STATUS.ARCHIVED"
               @click="ignoreModelStatus(model)"
               class="ignore-btn">
         <span class="btn-icon">🚫</span>
@@ -55,6 +55,10 @@
       <span v-else-if="model.isDownloaded === DOWNLOAD_STATUS.IGNORED" class="status-ignored">
         <span class="status-icon">🚫</span>
         <span class="status-text">Ignored</span>
+      </span>
+      <span v-else-if="model.isDownloaded === DOWNLOAD_STATUS.ARCHIVED" class="status-archived">
+        <span class="status-icon">📦</span>
+        <span class="status-text">Archived</span>
       </span>
       <span v-else class="no-download">-</span>
     </td>
@@ -112,7 +116,8 @@ export default {
              model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && 
              model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && 
              model.isDownloaded !== DOWNLOAD_STATUS.FAILED && 
-             model.isDownloaded !== DOWNLOAD_STATUS.IGNORED;
+             model.isDownloaded !== DOWNLOAD_STATUS.IGNORED &&
+             model.isDownloaded !== DOWNLOAD_STATUS.ARCHIVED;
     };
 
     const isModelDownloading = (modelId) => {
@@ -348,6 +353,14 @@ export default {
 
 .status-ignored {
   color: #888;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-archived {
+  color: #00838f;
   font-weight: 600;
   display: inline-flex;
   align-items: center;

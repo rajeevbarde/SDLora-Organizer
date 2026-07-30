@@ -100,6 +100,16 @@
                 <LoadingSpinner v-if="removingFromDisk" :loading="true" message="" size="small" class="spinner" />
                 <span>{{ removingFromDisk ? 'Removing...' : 'Remove from disk & ignore' }}</span>
               </button>
+              <button
+                v-if="showArchiveButton"
+                type="button"
+                class="archive-btn"
+                :disabled="archiving"
+                @click="archiveModel"
+              >
+                <LoadingSpinner v-if="archiving" :loading="true" message="" size="small" class="spinner" />
+                <span>{{ archiving ? 'Archiving...' : 'Archive' }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -319,13 +329,20 @@ export default {
       pollCount: 0,
       maxPolls: 300, // 10 minutes at 2s interval
       relatedLora: [],
-      removingFromDisk: false
+      removingFromDisk: false,
+      archiving: false
     };
   },
   computed: {
     showRemoveFromDiskButton() {
       if (!this.model) return false;
       return this.model.isDownloaded === this.DOWNLOAD_STATUS.DOWNLOADED;
+    },
+    showArchiveButton() {
+      if (!this.model) return false;
+      return this.model.isDownloaded !== this.DOWNLOAD_STATUS.DOWNLOADED
+        && this.model.isDownloaded !== this.DOWNLOAD_STATUS.DOWNLOADING
+        && this.model.isDownloaded !== this.DOWNLOAD_STATUS.ARCHIVED;
     }
   },
   mounted() {
@@ -523,6 +540,35 @@ export default {
         this.removingFromDisk = false;
       }
     },
+
+    async archiveModel() {
+      if (!this.model?.modelVersionId) return;
+
+      const fileName = this.model.fileName || this.getModelDisplayName();
+      const confirmed = window.confirm(
+        `Mark "${fileName}" as archived for analytics?\n\nUse this after backing up and removing the file from disk.`
+      );
+      if (!confirmed) return;
+
+      this.archiving = true;
+      try {
+        const result = await apiService.archiveModel(this.model.modelVersionId);
+        this.model.isDownloaded = DOWNLOAD_STATUS.ARCHIVED;
+        this.showNotification(
+          result.alreadyArchived
+            ? 'Model is already archived.'
+            : 'Model marked as archived.',
+          'success'
+        );
+      } catch (err) {
+        this.showNotification(
+          err.response?.data?.error || err.message || 'Failed to archive model.',
+          'error'
+        );
+      } finally {
+        this.archiving = false;
+      }
+    },
     
     formatDate,
     
@@ -548,6 +594,7 @@ export default {
       if (status === this.DOWNLOAD_STATUS.DOWNLOADING) return 'Downloading';
       if (status === this.DOWNLOAD_STATUS.FAILED) return 'Failed';
       if (status === this.DOWNLOAD_STATUS.IGNORED) return 'Ignored';
+      if (status === this.DOWNLOAD_STATUS.ARCHIVED) return 'Archived';
       return 'Not Downloaded';
     },
     
@@ -557,6 +604,7 @@ export default {
       if (status === this.DOWNLOAD_STATUS.DOWNLOADING) return 'status-badge--downloading';
       if (status === this.DOWNLOAD_STATUS.FAILED) return 'status-badge--failed';
       if (status === this.DOWNLOAD_STATUS.IGNORED) return 'status-badge--ignored';
+      if (status === this.DOWNLOAD_STATUS.ARCHIVED) return 'status-badge--archived';
       return 'status-badge--not-downloaded';
     },
     
@@ -594,6 +642,8 @@ export default {
         return 'Download failed';
       } else if (downloadStatus === 4) {
         return 'Download ignored';
+      } else if (downloadStatus === 5) {
+        return 'Archived';
       }
       return 'Unknown status';
     },
@@ -683,6 +733,7 @@ export default {
       if (status === this.DOWNLOAD_STATUS.DOWNLOADING) return 'Downloading';
       if (status === this.DOWNLOAD_STATUS.FAILED) return 'Failed';
       if (status === this.DOWNLOAD_STATUS.IGNORED) return 'Ignored';
+      if (status === this.DOWNLOAD_STATUS.ARCHIVED) return 'Archived';
       return 'Not Downloaded';
     },
     
@@ -691,6 +742,7 @@ export default {
       if (status === this.DOWNLOAD_STATUS.DOWNLOADING) return 'status-downloading';
       if (status === this.DOWNLOAD_STATUS.FAILED) return 'status-failed';
       if (status === this.DOWNLOAD_STATUS.IGNORED) return 'status-ignored';
+      if (status === this.DOWNLOAD_STATUS.ARCHIVED) return 'status-archived';
       return 'status-not-downloaded';
     },
     
@@ -885,6 +937,11 @@ export default {
   color: #ff9800;
 }
 
+.status-badge--archived {
+  background: rgba(0, 131, 143, 0.2);
+  color: #00838f;
+}
+
 .status-badge--not-downloaded {
   background: rgba(158, 158, 158, 0.2);
   color: #9e9e9e;
@@ -1016,6 +1073,45 @@ export default {
   background: #6c757d;
   border-color: #6c757d;
   cursor: not-allowed;
+}
+
+.archive-btn {
+  min-width: 120px;
+  height: 40px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: #00838f;
+  border: 1px solid #006064;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  transition: background 0.2s;
+}
+
+.archive-btn:hover:not(:disabled) {
+  background: #006974;
+}
+
+.archive-btn:disabled {
+  background: #6c757d;
+  border-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.quick-actions :deep(.status-archived) {
+  color: #00838f !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  background: rgba(0, 131, 143, 0.2) !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(0, 131, 143, 0.3) !important;
 }
 
 
@@ -1433,6 +1529,11 @@ export default {
 .status-ignored {
   background: rgba(255, 152, 0, 0.2);
   color: #ff9800;
+}
+
+.status-archived {
+  background: rgba(0, 131, 143, 0.2);
+  color: #00838f;
 }
 
 .status-not-downloaded {

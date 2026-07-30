@@ -927,6 +927,23 @@ class DatabaseService {
         }
     }
 
+    // Mark model as archived (isDownloaded = 5)
+    async markModelAsArchived(modelVersionId) {
+        let connection;
+        try {
+            connection = await dbPool.getConnection();
+            return await dbPool.runUpdate(
+                connection,
+                'UPDATE ALLCivitData SET isDownloaded = 5, last_updated = CURRENT_TIMESTAMP WHERE modelVersionId = ?',
+                [modelVersionId]
+            );
+        } finally {
+            if (connection) {
+                dbPool.releaseConnection(connection);
+            }
+        }
+    }
+
     // Mark model as ignored and clear file_path (for remove-from-disk)
     async markModelAsIgnoredAndClearPath(modelVersionId) {
         let connection;

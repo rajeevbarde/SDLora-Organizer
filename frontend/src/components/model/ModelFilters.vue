@@ -27,6 +27,7 @@
             <option value="1">Downloaded</option>
             <option value="3">Failed</option>
             <option value="4">Ignored</option>
+            <option value="5">Archived</option>
           </select>
         </div>
 

@@ -105,7 +105,8 @@ export default {
              model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && 
              model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && 
              model.isDownloaded !== DOWNLOAD_STATUS.FAILED && 
-             model.isDownloaded !== DOWNLOAD_STATUS.IGNORED;
+             model.isDownloaded !== DOWNLOAD_STATUS.IGNORED &&
+             model.isDownloaded !== DOWNLOAD_STATUS.ARCHIVED;
     };
 
     const toggleSelectAll = () => {

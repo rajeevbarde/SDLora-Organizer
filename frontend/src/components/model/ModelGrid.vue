@@ -106,7 +106,7 @@
             <div class="model-actions">
               
               <button 
-                v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED" 
+                v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED && model.isDownloaded !== DOWNLOAD_STATUS.ARCHIVED" 
                 @click="downloadModelFile(model)" 
                 class="action-btn download-btn"
                 :disabled="isModelDownloading(model.modelId)"
@@ -116,7 +116,7 @@
               </button>
               
               <button 
-                v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED"
+                v-if="model.fileDownloadUrl && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && model.isDownloaded !== DOWNLOAD_STATUS.FAILED && model.isDownloaded !== DOWNLOAD_STATUS.IGNORED && model.isDownloaded !== DOWNLOAD_STATUS.ARCHIVED"
                 @click="ignoreModelStatus(model)"
                 class="action-btn ignore-btn">
                 <span class="btn-icon">🚫</span>
@@ -145,6 +145,13 @@
                 class="status-badge ignored">
                 <span class="status-icon">🚫</span>
                 <span class="status-text">Ignored</span>
+              </span>
+
+              <span 
+                v-else-if="model.isDownloaded === DOWNLOAD_STATUS.ARCHIVED" 
+                class="status-badge archived">
+                <span class="status-icon">📦</span>
+                <span class="status-text">Archived</span>
               </span>
               
               <span v-else class="status-badge no-download">-</span>
@@ -243,7 +250,8 @@ export default {
              model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADED && 
              model.isDownloaded !== DOWNLOAD_STATUS.DOWNLOADING && 
              model.isDownloaded !== DOWNLOAD_STATUS.FAILED && 
-             model.isDownloaded !== DOWNLOAD_STATUS.IGNORED;
+             model.isDownloaded !== DOWNLOAD_STATUS.IGNORED &&
+             model.isDownloaded !== DOWNLOAD_STATUS.ARCHIVED;
     };
 
     const isModelSelected = (modelId) => {
@@ -1027,6 +1035,12 @@ export default {
   background: #f8f9fa;
   color: #6c757d;
   border: 1px solid #e9ecef;
+}
+
+.status-badge.archived {
+  background: #e0f2f1;
+  color: #00838f;
+  border: 1px solid #b2dfdb;
 }
 
 .status-badge.no-download {

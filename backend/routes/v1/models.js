@@ -217,6 +217,34 @@ router.post('/ignore', async (req, res) => {
     }
 });
 
+// Mark model as archived (isDownloaded = 5)
+router.post('/archive', async (req, res) => {
+    try {
+        const { modelVersionId } = req.body;
+        if (!modelVersionId) {
+            return res.status(400).json({ error: 'modelVersionId is required' });
+        }
+
+        const model = await databaseService.getModelDetail(modelVersionId);
+        if (!model) {
+            return res.status(404).json({ error: 'Model not found' });
+        }
+
+        if (model.isDownloaded === 1 || model.isDownloaded === 2) {
+            return res.status(400).json({ error: 'Cannot archive a downloaded or downloading model' });
+        }
+
+        if (model.isDownloaded === 5) {
+            return res.json({ success: true, alreadyArchived: true });
+        }
+
+        await databaseService.markModelAsArchived(modelVersionId);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Download JSON metadata without updating database
 router.post('/download-json-metadata', async (req, res) => {
     try {
