@@ -1046,6 +1046,17 @@ export default {
   border: 1px solid rgba(255, 152, 0, 0.3) !important;
 }
 
+.quick-actions :deep(.status-archived) {
+  color: #212529 !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  background: #ffc107 !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 6px !important;
+  border: 1px solid #ffb300 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
 .remove-disk-btn {
   min-width: 180px;
   height: 40px;
@@ -1081,9 +1092,9 @@ export default {
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #fff;
-  background: #00838f;
-  border: 1px solid #006064;
+  color: #212529;
+  background: #ffc107;
+  border: 1px solid #ffb300;
   border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
@@ -1092,26 +1103,17 @@ export default {
   gap: 0.5rem;
   box-sizing: border-box;
   transition: background 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .archive-btn:hover:not(:disabled) {
-  background: #006974;
+  background: #ffb300;
 }
 
 .archive-btn:disabled {
   background: #6c757d;
   border-color: #6c757d;
   cursor: not-allowed;
-}
-
-.quick-actions :deep(.status-archived) {
-  color: #00838f !important;
-  font-weight: 600 !important;
-  font-size: 0.85rem !important;
-  background: rgba(0, 131, 143, 0.2) !important;
-  padding: 0.5rem 1rem !important;
-  border-radius: 6px !important;
-  border: 1px solid rgba(0, 131, 143, 0.3) !important;
 }
 
 
